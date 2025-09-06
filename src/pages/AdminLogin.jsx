@@ -1,6 +1,7 @@
 import React, { useState, useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Eye, EyeOff, Leaf, ArrowRight, Sun} from 'lucide-react';
+import { fetchUsers } from "../service/userService";
+import { User, Lock, Eye, EyeOff, ArrowRight, Sun} from 'lucide-react';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -29,11 +30,11 @@ export default function AdminLogin() {
       newErrors.username = 'Please enter your username or email';
     }
     
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
+    // if (!formData.password) {
+    //   newErrors.password = 'Password is required';
+    // } else if (formData.password.length < 6) {
+    //   newErrors.password = 'Password must be at least 6 characters';
+    // }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -54,29 +55,42 @@ export default function AdminLogin() {
     }
   };
 
-  const handleLogin = () => {
-    
+  const handleLogin = async () => {
+  if (!validateForm()) return;
 
-    if (!validateForm()) return;
-    
-    setIsLoading(true);
-    setErrors({});
-    
-    setTimeout(() => {
-      if (
-        (formData.username === 'admin@da.gov.ph' || formData.username === 'admin') &&
-        formData.password === 'admin123'
-      ) {
-        setLoginSuccess(true);
+  setIsLoading(true);
+  setErrors({});
+
+  try {
+    const users = await fetchUsers();
+
+    // Check kung match ang username OR email + password
+    const user = users.find(
+      (u) =>
+        (u.username === formData.username || u.email === formData.username) &&
+        u.password === formData.password
+    );
+
+    if (user) {
+      setLoginSuccess(true);
+
+      // Show spinner for 2s before navigating
+      setTimeout(() => {
         navigate("/dashboard");
-      } else {
-        setErrors({
-          submit: 'Invalid credentials. Please try again.'
-        });
-      }
+        setIsLoading(false);
+      }, 2000);
+
+    } else {
+      setErrors({ submit: "Invalid credentials. Please try again." });
       setIsLoading(false);
-    }, 2000);
-  };
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    setErrors({ submit: "Something went wrong. Please try again later." });
+    setIsLoading(false);
+  }
+}; 
+
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -84,34 +98,7 @@ export default function AdminLogin() {
     }
   };
 
-  if (loginSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-orange-700 to-yellow-800 flex items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-20 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-yellow-400/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        </div>
-        
-        <div className="bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl p-12 text-center relative z-10 border border-white/20">
-          <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full mx-auto mb-8 flex items-center justify-center shadow-2xl animate-bounce">
-            <Leaf className="w-12 h-12 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-green-800 to-emerald-700 bg-clip-text text-transparent mb-4">
-            Welcome Back!
-          </h2>
-          <p className="text-gray-600 text-lg mb-8">Successfully logged into DA Portal</p>
-          <div className="flex items-center justify-center space-x-4">
-            <div className="flex space-x-1">
-              {[1,2,3].map((i) => (
-                <div key={i} className={`w-3 h-3 bg-green-500 rounded-full animate-bounce`} style={{animationDelay: `${i * 0.2}s`}}></div>
-              ))}
-            </div>
-            <span className="text-green-700 font-semibold">Loading dashboard...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
         <div className="min-h-screen relative overflow-hidden">

@@ -32,46 +32,46 @@ const Header = ({ setIsSidebarOpen }) => {
       </div>
 
      {/* Profile Menu */}
-<div className="relative">
-  <button 
-    onClick={() => setShowProfileMenu(!showProfileMenu)}
-    className="flex items-center space-x-3 text-gray-700 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100"
-  >
-    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-      <span className="text-white text-sm font-medium">J</span>
-    </div>
-    <div className="hidden sm:block text-left">
-      <p className="text-sm font-medium">John Harvee Quirido</p>
-      <p className="text-xs text-gray-500">Super Admin</p>
-    </div>
-    {/* Dropdown arrow */}
-    <ChevronDown 
-      className={`h-4 w-4 transition-transform duration-200 ${
-        showProfileMenu ? 'rotate-180' : 'rotate-0'
-      }`} 
-    />
-  </button>
+        <div className="relative">
+        <button 
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center space-x-3 text-gray-700 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100"
+        >
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+            <span className="text-white text-sm font-medium">J</span>
+            </div>
+            <div className="hidden sm:block text-left">
+            <p className="text-sm font-medium">John Harvee Quirido</p>
+            <p className="text-xs text-gray-500">Super Admin</p>
+            </div>
+            {/* Dropdown arrow */}
+            <ChevronDown 
+            className={`h-4 w-4 transition-transform duration-200 ${
+                showProfileMenu ? 'rotate-180' : 'rotate-0'
+            }`} 
+            />
+        </button>
 
-  {showProfileMenu && (
-    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-      <div className="py-2">
-        <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full">
-          <User className="h-4 w-4 mr-3" />
-          Profile Settings
-        </button>
-        <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full">
-          <Settings className="h-4 w-4 mr-3" />
-          System Settings
-        </button>
-        <hr className="my-2" />
-        <button className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
-          <LogOut className="h-4 w-4 mr-3" />
-          Logout
-        </button>
-      </div>
-    </div>
-  )}
-</div>
+        {showProfileMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+            <div className="py-2">
+                <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full">
+                <User className="h-4 w-4 mr-3" />
+                Profile Settings
+                </button>
+                <button className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full">
+                <Settings className="h-4 w-4 mr-3" />
+                System Settings
+                </button>
+                <hr className="my-2" />
+                <button className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
+                <LogOut className="h-4 w-4 mr-3" />
+                Logout
+                </button>
+            </div>
+            </div>
+        )}
+        </div>
 
     </div>
   </div>
