@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect} from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, Leaf, ArrowRight, Sun} from 'lucide-react';
 
 export default function AdminLogin() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -52,6 +55,8 @@ export default function AdminLogin() {
   };
 
   const handleLogin = () => {
+    
+
     if (!validateForm()) return;
     
     setIsLoading(true);
@@ -63,6 +68,7 @@ export default function AdminLogin() {
         formData.password === 'admin123'
       ) {
         setLoginSuccess(true);
+        navigate("/dashboard");
       } else {
         setErrors({
           submit: 'Invalid credentials. Please try again.'
