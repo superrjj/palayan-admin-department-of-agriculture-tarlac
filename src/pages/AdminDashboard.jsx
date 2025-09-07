@@ -4,7 +4,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import Header from '../components/Layout/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import Dashboard from '../components/Dashboard/Dashboard';
-import RiceVarieties from '../components/RiceVarieties/RiceVarieties';
+import RiceVarietiesManagement from '../components/RiceVarietiesManagement/RiceVarietiesManagement';
 import PestManagement from '../components/PestManagement/PestManagement';
 import DiseaseManagement from '../components/DiseaseManagement/DiseaseManagement';
 import AdminManagement from '../components/AdminManagement/AdminManagement';
@@ -34,7 +34,7 @@ const AdminDashboard = () => {
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route index element={<Dashboard mockData={mockData} />} />
-            <Route path="varieties" element={<RiceVarieties mockData={mockData} />} />
+            <Route path="varieties" element={<RiceVarietiesManagement mockData={mockData} />} />
             <Route path="pests" element={<PestManagement mockData={mockData} />} />
             <Route path="diseases" element={<DiseaseManagement mockData={mockData} />} />
             <Route path="admins" element={<AdminManagement mockData={mockData} />} />
