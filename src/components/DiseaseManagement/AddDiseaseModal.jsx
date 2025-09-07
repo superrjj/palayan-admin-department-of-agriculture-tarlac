@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, CheckCircle, UploadCloud, Book, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
+import { X, UploadCloud, Book, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../firebase/config";
 
@@ -19,6 +19,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const isEdit = !!diseaseData;
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length + images.length > 1000) {
@@ -27,41 +28,70 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     }
     setImages((prev) => [...prev, ...files]);
   };
+
   const handleRemoveImage = (index) => setImages((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (images.length === 0) return alert("Please upload at least 1 image.");
+    if (!formData.name) return alert("Disease name is required.");
+    if (images.length === 0 && !isEdit) return alert("Please upload at least 1 image.");
 
-    const urls = [];
-    for (let i = 0; i < images.length; i++) {
-      const file = images[i];
-      const storageRef = ref(storage, `disease_images/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+    try {
+      let imageUrls = [];
+      let mainImageUrl = diseaseData?.mainImageUrl || "";
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          setUploadProgress(progress);
-        },
-        (error) => console.error(error),
-        async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          urls.push(url);
-          if (urls.length === images.length) {
-            await onSave({ ...formData, images: urls }, diseaseData?.id);
-            setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
-            setImages([]);
-            setUploadProgress(0);
-          }
-        }
-      );
+      // Only upload if there are new images
+      if (images.length > 0) {
+        // Upload all images to Firebase Storage
+        imageUrls = await Promise.all(
+          images.map(async (file) => {
+            const storageRef = ref(storage, `rice_disease/${formData.name}/${Date.now()}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            return new Promise((resolve, reject) => {
+              uploadTask.on(
+                "state_changed",
+                (snapshot) => {
+                  const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                  setUploadProgress(progress);
+                },
+                (error) => reject(error),
+                async () => {
+                  const url = await getDownloadURL(uploadTask.snapshot.ref);
+                  resolve(url);
+                }
+              );
+            });
+          })
+        );
+
+        // Set main image URL to the first uploaded image
+        mainImageUrl = imageUrls[0];
+      }
+
+      // Prepare data to save - use existing images if no new images uploaded
+      const dataToSave = {
+        ...formData,
+        images: imageUrls.length > 0 ? imageUrls : (diseaseData?.images || []),
+        mainImageUrl: mainImageUrl,
+      };
+
+      // Call onSave with the prepared data
+      await onSave(dataToSave, diseaseData?.id);
+
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose(); // Close modal after showing success
+      }, 2000);
+      setImages([]);
+      setUploadProgress(0);
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      alert("Error saving disease. Please try again.");
     }
   };
 
-  // Map fields to icons
   const fieldIcons = {
     name: Book,
     scientificName: Globe,
@@ -84,20 +114,19 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-         {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
+          {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
             const Icon = fieldIcons[field];
-            //label
             const label =
-                field === "name" ? "Disease Name" :
-                field === "scientificName" ? "Scientific Name" :
-                field.charAt(0).toUpperCase() + field.slice(1);
+              field === "name" ? "Disease Name" :
+              field === "scientificName" ? "Scientific Name" :
+              field.charAt(0).toUpperCase() + field.slice(1);
 
             return (
-                <div key={field} className="mb-3">
+              <div key={field} className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                 <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500 transition">
-                    {Icon && <Icon className="w-4 h-4 text-gray-400 mr-2" />}
-                    <input
+                  {Icon && <Icon className="w-4 h-4 text-gray-400 mr-2" />}
+                  <input
                     type="text"
                     name={field}
                     value={formData[field]}
@@ -105,19 +134,41 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
                     className="w-full p-2 outline-none"
                     placeholder={`Enter ${label}`}
                     required
-                    />
+                  />
                 </div>
-                </div>
+              </div>
             );
-            })}
+          })}
 
+          {/* Show existing images if editing */}
+          {isEdit && diseaseData?.images && diseaseData.images.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Images</label>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {diseaseData.images.slice(0, 6).map((imgUrl, idx) => (
+                  <div key={idx} className="relative rounded-lg overflow-hidden border">
+                    <img src={imgUrl} alt={`current-${idx}`} className="w-full h-20 object-cover" />
+                  </div>
+                ))}
+                {diseaseData.images.length > 6 && (
+                  <div className="flex items-center justify-center rounded-lg border bg-gray-100">
+                    <span className="text-xs text-gray-500">+{diseaseData.images.length - 6} more</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Drag & Drop Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Upload Images</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {isEdit ? "Upload New Images (Optional)" : "Upload Images"}
+            </label>
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-5 cursor-pointer hover:border-green-500 transition">
               <UploadCloud className="w-10 h-10 text-gray-400 mb-2" />
-              <span className="text-gray-500 text-sm text-center">Click or drag files here (min. of 300 & max. of 1000)</span>
+              <span className="text-gray-500 text-sm text-center">
+                Click or drag files here {isEdit ? "(Optional)" : "(min. of 1 & max. of 1000)"}
+              </span>
               <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
             </label>
 
@@ -164,7 +215,6 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         </form>
       </div>
 
-      {/* Success Message */}
       {success && (
         <div className="absolute inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-5 flex flex-col items-center animate-fadeIn scale-up">
