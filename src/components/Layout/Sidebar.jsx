@@ -34,7 +34,7 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
               <Wheat className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-gray-800">John Harvee Quirido</h1>
+            <h1 className="text-xl font-bold text-gray-800">PalaYan</h1>
           </div>
           <button
             onClick={() => setIsSidebarOpen(false)}

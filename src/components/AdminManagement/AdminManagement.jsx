@@ -120,22 +120,27 @@ const AdminManagement = () => {
   };
 
     const handleDelete = async (id) => {
-      try {
-        // Delete from Firestore
-        await deleteDoc(doc(db, "accounts", id));
+  try {
+    // Show success animation first
+    setSuccessDelete(true);
 
-        // Update UI
-        setAdmins((prev) => prev.filter((a) => a.id !== id));
+    setTimeout(async () => {
+      // Delete from Firestore
+      await deleteDoc(doc(db, "accounts", id));
 
-        // Show success animation
-        setSuccessDelete(true);
-        setTimeout(() => setSuccessDelete(false), 3000);
+      // Update UI
+      setAdmins((prev) => prev.filter((a) => a.id !== id));
 
-        console.log(`Admin ${id} has been deleted.`);
-      } catch (error) {
-        console.error("Failed to delete admin:", error);
-      }
-    };
+      // Hide animation
+      setSuccessDelete(false);
+
+      console.log(`Admin ${id} has been deleted.`);
+    }, 1000); // 1 second delay para makita dialog first
+  } catch (error) {
+    console.error("Failed to delete admin:", error);
+  }
+};
+
 
 
   return (

@@ -13,7 +13,7 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   });
 
   const [success, setSuccess] = useState(false);
-  const [successDelete, setSuccessDelete] = useState(false);
+
 
   const isEdit = !!adminData;
 
@@ -28,15 +28,16 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     special: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password),
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData, adminData?.id);
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
-      onClose();
-    }, 3000);
-  };
+ const handleSubmit = (e) => {
+  e.preventDefault();
+  onSave(formData, adminData?.id);
+  setSuccess(true);
+
+  setTimeout(() => {
+    setSuccess(false); 
+   
+  }, 3000); 
+};
 
   const securityQuestions = [
     "What is your mother's maiden name?",
@@ -197,17 +198,17 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
         </form>
       </div>
 
-     {successDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
-            {/* Trashcan Icon */}
-            <svg className="w-20 h-20 text-red-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7L5 7M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" />
+      {/* Success Animation */}
+      {success && (
+        <div className="absolute inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
+            <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
-            <h3 className="text-lg font-semibold text-red-600">Admin deleted!</h3>
-            </div>
+            <h3 className="text-lg font-semibold text-green-600">Account {isEdit ? "updated" : "created"} successfully!</h3>
+          </div>
         </div>
-        )}
+      )}
     </div>
   );
 };

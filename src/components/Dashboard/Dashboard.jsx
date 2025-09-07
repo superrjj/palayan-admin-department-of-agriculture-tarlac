@@ -1,14 +1,35 @@
 // components/Dashboard/Dashboard.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wheat, Bug, Shield, Users, Activity } from 'lucide-react';
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config";
 
 const Dashboard = ({ mockData }) => {
   const { overview } = mockData;
-  
+
+  // State for Firestore counts
+  const [totalAdmins, setTotalAdmins] = useState(0);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "accounts"));
+        const adminsCount = querySnapshot.docs.filter(
+          doc => doc.data().role === "admin" || doc.data().role === "super admin"
+        ).length;
+        setTotalAdmins(adminsCount);
+      } catch (error) {
+        console.error("Error fetching admins: ", error);
+      }
+    };
+
+    fetchAdmins();
+  }, []);
+
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard Overview</h1>
-      
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">Overview</h1>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
@@ -20,7 +41,7 @@ const Dashboard = ({ mockData }) => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
           <div className="flex items-center">
             <Bug className="h-8 w-8 text-red-500" />
@@ -30,7 +51,7 @@ const Dashboard = ({ mockData }) => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-orange-500">
           <div className="flex items-center">
             <Shield className="h-8 w-8 text-orange-500" />
@@ -40,13 +61,13 @@ const Dashboard = ({ mockData }) => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
           <div className="flex items-center">
             <Users className="h-8 w-8 text-blue-500" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Admin Users</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.totalAdmins}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalAdmins}</p>
             </div>
           </div>
         </div>

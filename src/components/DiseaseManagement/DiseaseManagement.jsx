@@ -1,97 +1,146 @@
 // components/DiseaseManagement/DiseaseManagement.jsx
-import React, { useState } from 'react';
-import { Plus, Search, Eye, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import DiseaseHeader from '../DiseaseManagement/DiseaseHeader';
+import DiseaseTable from '../DiseaseManagement/DiseaseTable';
+import AddDiseaseModal from '../DiseaseManagement/AddDiseaseModal'; 
+import { addDoc, collection, onSnapshot, updateDoc, doc , deleteDoc } from "firebase/firestore";
+import { db } from "../../firebase/config";
 
-const DiseaseManagement = ({ mockData }) => {
-  const [diseases] = useState(mockData.diseases);
+const DiseaseManagement = () => {
+  const [diseases, setDiseases] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const filteredDiseases = diseases.filter(disease =>
-    disease.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editDisease, setEditDisease] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [successDelete, setSuccessDelete] = useState(false);
+  const itemsPerPage = 50;
+
+  // Realtime fetch diseases from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "diseases"),
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setDiseases(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching diseases:", error);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // Filtering
+  const filteredDiseases = diseases.filter(
+    (d) =>
+      (d.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.description || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case 'High': return 'text-red-600 bg-red-100';
-      case 'Medium': return 'text-yellow-600 bg-yellow-100';
-      case 'Low': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+  // Pagination
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedDiseases = filteredDiseases.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(filteredDiseases.length / itemsPerPage);
+
+  // Actions
+  const handleAddNew = () => {
+    setEditDisease(null);
+    setIsModalOpen(true);
+  };
+
+  const handleAddOrEditDisease = async (diseaseData, id) => {
+    try {
+      if (id) {
+        await updateDoc(doc(db, "diseases", id), {
+          ...diseaseData,
+          updatedAt: new Date(),
+        });
+      } else {
+        await addDoc(collection(db, "diseases"), {
+          ...diseaseData,
+          createdAt: new Date(),
+        });
+      }
+      setIsModalOpen(false);
+      setEditDisease(null);
+    } catch (error) {
+      console.error("Error saving disease:", error);
+    }
+  };
+
+  const handleEdit = (disease) => {
+    setEditDisease(disease);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      // Show success animation first
+      setSuccessDelete(true);
+
+      setTimeout(async () => {
+        // Delete from Firestore
+        await deleteDoc(doc(db, "diseases", id));
+
+        // Update UI
+        setDiseases((prev) => prev.filter((d) => d.id !== id));
+
+        // Hide animation
+        setSuccessDelete(false);
+
+        console.log(`Disease ${id} has been deleted.`);
+      }, 1000); // 1 second delay para makita dialog first
+    } catch (error) {
+      console.error("Failed to delete disease:", error);
     }
   };
 
   return (
-    <div className="p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Disease Management</h1>
-        <button className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
-          <Plus className="h-4 w-4 mr-2" />
-          Add New Disease
-        </button>
-      </div>
+    <div className="p-4 lg:p-6">
+      <DiseaseHeader
+        onAddNew={handleAddNew}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+      />
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search diseases..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <DiseaseTable
+        diseases={paginatedDiseases}
+        loading={loading}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        setCurrentPage={setCurrentPage}
+        startIndex={startIndex}
+        itemsPerPage={itemsPerPage}
+        filteredDiseases={filteredDiseases}
+      />
+
+      {isModalOpen && (
+        <AddDiseaseModal
+          onClose={() => { setIsModalOpen(false); setEditDisease(null); }}
+          onSave={handleAddOrEditDisease}
+          diseaseData={editDisease}
+        />
+      )}
+
+      {/* Success Delete Animation */}
+      {successDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
+            <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <h3 className="text-lg font-semibold text-green-600">Disease deleted successfully!</h3>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDiseases.map((disease) => (
-            <div key={disease.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">{disease.name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(disease.severity)}`}>
-                  {disease.severity}
-                </span>
-              </div>
-              
-              <div className="mb-4 space-y-2">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-800">Pathogen:</span> 
-                  <span className="italic ml-1">{disease.cause}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-800">Symptoms:</span> 
-                  <span className="ml-1">{disease.symptoms}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-800">Treatment:</span> 
-                  <span className="ml-1">{disease.treatment}</span>
-                </p>
-              </div>
-              
-              <div className="flex space-x-2">
-                <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center transition-colors">
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </button>
-                <button className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center transition-colors">
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </button>
-                <button className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center transition-colors">
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {filteredDiseases.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No diseases found matching your search.</p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
