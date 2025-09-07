@@ -9,9 +9,8 @@ import PestManagement from '../components/PestManagement/PestManagement';
 import DiseaseManagement from '../components/DiseaseManagement/DiseaseManagement';
 import AdminManagement from '../components/AdminManagement/AdminManagement';
 
-// Mock data (same as before)
+// Mock data
 import { mockData } from '../data/mockData';
-
 
 const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -22,7 +21,7 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <Sidebar
         onNavigate={(path) => {
-          navigate(path === '/' ? '/' : `/${path}`);
+          navigate(`/admin_dashboard/${path}`);
           setIsSidebarOpen(false);
         }}
         isSidebarOpen={isSidebarOpen}
@@ -34,7 +33,7 @@ const AdminDashboard = () => {
         <Header setIsSidebarOpen={setIsSidebarOpen} />
         <main className="flex-1 overflow-y-auto">
           <Routes>
-            <Route path="/" element={<Dashboard mockData={mockData} />} />
+            <Route index element={<Dashboard mockData={mockData} />} />
             <Route path="varieties" element={<RiceVarieties mockData={mockData} />} />
             <Route path="pests" element={<PestManagement mockData={mockData} />} />
             <Route path="diseases" element={<DiseaseManagement mockData={mockData} />} />

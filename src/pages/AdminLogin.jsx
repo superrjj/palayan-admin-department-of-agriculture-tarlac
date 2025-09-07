@@ -76,7 +76,7 @@ export default function AdminLogin() {
 
       // Show spinner for 2s before navigating
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate("/admin_dashboard");
         setIsLoading(false);
       }, 2000);
 
