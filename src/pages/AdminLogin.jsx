@@ -69,10 +69,10 @@ export default function AdminLogin() {
     );
 
     if (user) {
-      // --- UPDATE lastLogin sa Firestore ---
       try {
         await updateDoc(doc(db, "accounts", user.id), {
-          lastLogin: new Date()
+          lastLogin: new Date(),
+          status: "active" 
         });
       } catch (error) {
         console.error("Failed to update lastLogin:", error);

@@ -12,13 +12,13 @@ const AdminTable = ({
 }) => {
 
   const getRoleIcon = (role) => role === 'super admin'
-    ? <Shield className="w-4 h-4 text-red-500" />
+    ? <Shield className="w-4 h-4 text-violet-500" />
     : <UserCheck className="w-4 h-4 text-blue-500" />;
 
   const getRoleBadge = (role = 'admin') => {
     const baseClasses = "px-2 lg:px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1";
     const roleClasses = role === 'super admin' 
-      ? "bg-red-100 text-red-800 border border-red-200" 
+      ? "bg-violet-100 text-violet-800 border border-violet-200" 
       : "bg-blue-100 text-blue-800 border border-blue-200";
     
     return (
@@ -57,7 +57,7 @@ const AdminTable = ({
                 <td colSpan="8" className="px-6 py-12 text-center">
                   <div className="flex flex-col items-center">
                     <Users className="w-16 h-16 text-gray-300 mb-4" />
-                    <p className="text-gray-500 text-lg">No admins found</p>
+                    <p className="text-gray-500 text-lg">No admin found</p>
                   </div>
                 </td>
               </tr>
