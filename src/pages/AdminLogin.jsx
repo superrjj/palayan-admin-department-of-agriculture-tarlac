@@ -1,6 +1,8 @@
 import React, { useState, useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUsers } from "../service/userService";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase/config"; 
 import { User, Lock, Eye, EyeOff, ArrowRight, Sun} from 'lucide-react';
 
 export default function AdminLogin() {
@@ -30,11 +32,6 @@ export default function AdminLogin() {
       newErrors.username = 'Please enter your username or email';
     }
     
-    // if (!formData.password) {
-    //   newErrors.password = 'Password is required';
-    // } else if (formData.password.length < 6) {
-    //   newErrors.password = 'Password must be at least 6 characters';
-    // }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -72,6 +69,15 @@ export default function AdminLogin() {
     );
 
     if (user) {
+      // --- UPDATE lastLogin sa Firestore ---
+      try {
+        await updateDoc(doc(db, "accounts", user.id), {
+          lastLogin: new Date()
+        });
+      } catch (error) {
+        console.error("Failed to update lastLogin:", error);
+      }
+
       setLoginSuccess(true);
 
       // Show spinner for 2s before navigating
@@ -89,7 +95,7 @@ export default function AdminLogin() {
     setErrors({ submit: "Something went wrong. Please try again later." });
     setIsLoading(false);
   }
-}; 
+};
 
 
   const handleKeyDown = (e) => {
