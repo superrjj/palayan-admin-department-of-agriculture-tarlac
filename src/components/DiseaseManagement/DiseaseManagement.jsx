@@ -18,7 +18,7 @@ const DiseaseManagement = () => {
   const [saveAction, setSaveAction] = useState('');
   const itemsPerPage = 50;
 
-  // 🔴 ADD: states for custom delete modal
+  //states for custom delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState(null);
 

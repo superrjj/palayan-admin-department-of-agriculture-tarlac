@@ -1,24 +1,22 @@
 import React, { useState } from "react";
-import { X, UploadCloud, Book, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
+import { X, UploadCloud, Bug, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../firebase/config";
 
-const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
+const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   const [formData, setFormData] = useState({
-    name: diseaseData?.name || "",
-    scientificName: diseaseData?.scientificName || "",
-    description: diseaseData?.description || "",
-    cause: diseaseData?.cause || "",
-    symptoms: diseaseData?.symptoms || "",
-    treatments: diseaseData?.treatments || "",
+    name: pestData?.name || "",
+    scientificName: pestData?.scientificName || "",
+    description: pestData?.description || "",
+    cause: pestData?.cause || "",
+    symptoms: pestData?.symptoms || "",
+    treatments: pestData?.treatments || "",
   });
 
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const isEdit = !!diseaseData;
-
-
+  const isEdit = !!pestData;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -29,8 +27,8 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     console.log("Selected files:", files);
-    
-    if (files.length + images.length > 10) { // Reduced limit for testing
+
+    if (files.length + images.length > 10) {
       alert("You can upload a maximum of 10 images.");
       return;
     }
@@ -46,7 +44,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     console.log("Starting image upload for", imageFiles.length, "files");
     const uploadPromises = imageFiles.map(async (file, index) => {
       const fileName = `${Date.now()}_${index}_${file.name}`;
-      const storageRef = ref(storage, `rice_disease/${formData.name}/${fileName}`);
+      const storageRef = ref(storage, `rice_pests/${formData.name}/${fileName}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       return new Promise((resolve, reject) => {
@@ -81,32 +79,29 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.name.trim()) {
-      alert("Disease name is required.");
+      alert("Pest name is required.");
       return;
     }
 
     if (!isEdit && images.length === 0) {
-      alert("Please upload at least 1 image for new diseases.");
+      alert("Please upload at least 1 image for new pests.");
       return;
     }
 
     setUploading(true);
-    
+
     try {
       let imageUrls = [];
-      let mainImageUrl = diseaseData?.mainImageUrl || "";
+      let mainImageUrl = pestData?.mainImageUrl || "";
 
-      // Upload new images if any
       if (images.length > 0) {
         console.log("Uploading", images.length, "images...");
         imageUrls = await uploadImages(images);
-        mainImageUrl = imageUrls[0]; // Use first uploaded image as main
+        mainImageUrl = imageUrls[0];
         console.log("All images uploaded:", imageUrls);
       }
 
-      // Prepare data to save
       const dataToSave = {
         name: formData.name.trim(),
         scientificName: formData.scientificName.trim(),
@@ -115,31 +110,26 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         symptoms: formData.symptoms.trim(),
         treatments: formData.treatments.trim(),
         mainImageUrl: mainImageUrl,
-        images: imageUrls.length > 0 ? imageUrls : (diseaseData?.images || []),
+        images: imageUrls.length > 0 ? imageUrls : (pestData?.images || []),
       };
 
       console.log("Calling onSave with data:", dataToSave);
-      
-      // Call the parent's save function
-      await onSave(dataToSave, diseaseData?.id);
-      
 
-      // Reset form
+      await onSave(dataToSave, pestData?.id);
+
       setImages([]);
       setUploadProgress(0);
-      
-      // Don't close modal here - let parent handle it
-      
+
     } catch (error) {
       console.error("Error in form submission:", error);
-      alert(`Error saving disease: ${error.message}`);
+      alert(`Error saving pest: ${error.message}`);
     } finally {
       setUploading(false);
     }
   };
 
   const fieldIcons = {
-    name: Book,
+    name: Bug,
     scientificName: Globe,
     description: Info,
     cause: AlertCircle,
@@ -152,7 +142,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 relative max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4 border-b pb-2">
           <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
-            {isEdit ? "Edit Disease" : "Add New Disease"}
+            {isEdit ? "Edit Pest" : "Add New Pest"}
           </h2>
           <button 
             onClick={onClose} 
@@ -167,7 +157,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
           {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
             const Icon = fieldIcons[field];
             const label =
-              field === "name" ? "Disease Name" :
+              field === "name" ? "Pest Name" :
               field === "scientificName" ? "Scientific Name" :
               field.charAt(0).toUpperCase() + field.slice(1);
 
@@ -206,11 +196,11 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
           })}
 
           {/* Show existing images if editing */}
-          {isEdit && diseaseData?.images && diseaseData.images.length > 0 && (
+          {isEdit && pestData?.images && pestData.images.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Current Images</label>
               <div className="grid grid-cols-3 gap-2 mb-2">
-                {diseaseData.images.slice(0, 6).map((imgUrl, idx) => (
+                {pestData.images.slice(0, 6).map((imgUrl, idx) => (
                   <div key={idx} className="relative rounded-lg overflow-hidden border">
                     <img 
                       src={imgUrl} 
@@ -222,9 +212,9 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
                     />
                   </div>
                 ))}
-                {diseaseData.images.length > 6 && (
+                {pestData.images.length > 6 && (
                   <div className="flex items-center justify-center rounded-lg border bg-gray-100">
-                    <span className="text-xs text-gray-500">+{diseaseData.images.length - 6} more</span>
+                    <span className="text-xs text-gray-500">+{pestData.images.length - 6} more</span>
                   </div>
                 )}
               </div>
@@ -252,7 +242,6 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
               />
             </label>
 
-            {/* Image Previews */}
             {images.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mt-2">
                 {images.map((img, idx) => (
@@ -316,4 +305,4 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   );
 };
 
-export default AddDiseaseModal;
+export default AddPestModal;

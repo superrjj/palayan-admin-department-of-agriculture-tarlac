@@ -47,7 +47,7 @@ const Dashboard = ({ mockData }) => {
   
   const fetchPest = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "pests"));
+      const querySnapshot = await getDocs(collection(db, "rice_local_pests"));
       setTotalPest(querySnapshot.size);
     } catch (error) {
       console.error("Error fetching varieties: ", error);
