@@ -11,6 +11,7 @@ const Dashboard = ({ mockData }) => {
   const [totalAdmins, setTotalAdmins] = useState(0);
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalVarieties, setTotalVarieties] = useState(0);
+  const [totalPests, setTotalPest] = useState(0);
 
   useEffect(() => {
     const fetchAdmins = async () => {
@@ -43,9 +44,20 @@ const Dashboard = ({ mockData }) => {
     }
   };
 
+  
+  const fetchPest = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "pests"));
+      setTotalPest(querySnapshot.size);
+    } catch (error) {
+      console.error("Error fetching varieties: ", error);
+    }
+  };
+
     fetchAdmins();
     fetchDiseases();
     fetchVarieties();
+    fetchPest();
   }, []);
 
   
@@ -71,7 +83,7 @@ const Dashboard = ({ mockData }) => {
             <Bug className="h-8 w-8 text-red-500" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Pests</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.totalPests}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalPests}</p>
             </div>
           </div>
         </div>

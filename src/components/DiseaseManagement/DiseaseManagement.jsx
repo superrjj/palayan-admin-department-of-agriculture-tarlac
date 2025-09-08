@@ -97,7 +97,6 @@ const DiseaseManagement = () => {
       await deleteDoc(doc(db, "rice_local_diseases", id));
       setTimeout(() => setSuccessDelete(false), 2000);
     } catch (err) {
-      console.error("Failed to delete disease:", err);
       setSuccessDelete(false);
       alert(`Failed to delete disease: ${err.message}`);
     }
@@ -159,6 +158,23 @@ const DiseaseManagement = () => {
                 {disease.description && (
                   <p className="text-gray-600 mt-2 text-sm">{disease.description}</p>
                 )}
+
+                {/*Created & Last Updated display */}
+                <div className="mt-3 text-xs text-gray-500 space-y-1">
+                  <p>
+                    <span className="font-medium">Created Date:</span>{" "}
+                    {disease.createdAt?.toDate
+                      ? disease.createdAt.toDate().toLocaleString()
+                      : "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Last Updated:</span>{" "}
+                    {disease.updatedAt?.toDate
+                      ? disease.updatedAt.toDate().toLocaleString()
+                      : "-"}
+                  </p>
+                </div>
+
                 <div className="flex justify-between mt-3 space-x-2">
                   <button 
                     className="flex-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition" 
@@ -174,6 +190,7 @@ const DiseaseManagement = () => {
                   </button>
                 </div>
               </div>
+
             ))
           )}
         </div>
