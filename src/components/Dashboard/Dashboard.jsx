@@ -9,6 +9,8 @@ const Dashboard = ({ mockData }) => {
 
   // State for Firestore counts
   const [totalAdmins, setTotalAdmins] = useState(0);
+  const [totalDiseases, setTotalDiseases] = useState(0);
+  const [totalVarieties, setTotalVarieties] = useState(0);
 
   useEffect(() => {
     const fetchAdmins = async () => {
@@ -23,8 +25,30 @@ const Dashboard = ({ mockData }) => {
       }
     };
 
+     const fetchDiseases = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "rice_local_diseases"));
+        setTotalDiseases(querySnapshot.size); // total docs in collection
+      } catch (error) {
+        console.error("Error fetching diseases: ", error);
+      }
+    };
+
+    const fetchVarieties = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "rice_seed_varieties"));
+      setTotalVarieties(querySnapshot.size);
+    } catch (error) {
+      console.error("Error fetching varieties: ", error);
+    }
+  };
+
     fetchAdmins();
+    fetchDiseases();
+    fetchVarieties();
   }, []);
+
+  
 
   return (
     <div className="p-6">
@@ -37,7 +61,7 @@ const Dashboard = ({ mockData }) => {
             <Wheat className="h-8 w-8 text-green-500" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Rice Varieties</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.totalVarieties}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalVarieties}</p>
             </div>
           </div>
         </div>
@@ -57,7 +81,7 @@ const Dashboard = ({ mockData }) => {
             <Shield className="h-8 w-8 text-orange-500" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Diseases</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.totalDiseases}</p>
+              <p className="text-2xl font-bold text-gray-900">{totalDiseases}</p>
             </div>
           </div>
         </div>
