@@ -5,6 +5,7 @@ import AddPestModal from './AddPestModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
+
 const PestManagement = () => {
   const [pests, setPests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,10 +69,12 @@ const PestManagement = () => {
         dataToSave.updatedAt = new Date();
         await updateDoc(doc(db, "rice_local_pests", id), dataToSave);
         setSaveAction('updated');
+
       } else {
         dataToSave.createdAt = new Date();
         await addDoc(collection(db, "rice_local_pests"), dataToSave);
         setSaveAction('added');
+
       }
 
       setIsModalOpen(false);
@@ -91,8 +94,13 @@ const PestManagement = () => {
 
   const performDelete = async (id) => {
     try {
+
+      const deletedPest = pests.find((p) => p.id === id);
+
       setSuccessDelete(true);
       await deleteDoc(doc(db, "rice_local_pests", id));
+
+
       setTimeout(() => setSuccessDelete(false), 2000);
     } catch (err) {
       setSuccessDelete(false);

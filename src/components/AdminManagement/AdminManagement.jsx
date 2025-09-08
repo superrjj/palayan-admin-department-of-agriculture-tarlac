@@ -5,6 +5,7 @@ import AddAdminModal from '../AdminManagement/AddAdminModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc , deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
+
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,6 +100,8 @@ const AdminManagement = () => {
           ...adminData,
           updatedAt: new Date(),
         });
+
+
       } else {
         await addDoc(collection(db, "accounts"), {
           ...adminData,
@@ -106,6 +109,7 @@ const AdminManagement = () => {
           createdAt: new Date(),
           lastLogin: null,
         });
+
       }
       setIsModalOpen(false);
       setEditAdmin(null);

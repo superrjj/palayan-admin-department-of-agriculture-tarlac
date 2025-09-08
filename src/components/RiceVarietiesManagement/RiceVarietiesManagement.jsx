@@ -5,6 +5,7 @@ import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal'
 import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
+
 const RiceVarietiesManagement = () => {
   const [varieties, setVarieties] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,8 +39,9 @@ const RiceVarietiesManagement = () => {
   // Filtering
   const filteredVarieties = varieties.filter(
     (v) =>
-      (v.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.description || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (v.varietyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.yearRelease || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.location || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Pagination
@@ -60,11 +62,14 @@ const RiceVarietiesManagement = () => {
           ...varietyData,
           updatedAt: new Date(),
         });
+
+        
       } else {
         await addDoc(collection(db, "rice_seed_varieties"), {
           ...varietyData,
           createdAt: new Date(),
         });
+
       }
       setIsModalOpen(false);
       setEditVariety(null);
@@ -80,11 +85,13 @@ const RiceVarietiesManagement = () => {
 
   const handleDelete = async (id) => {
     try {
+     
       setSuccessDelete(true);
 
       setTimeout(async () => {
-        await deleteDoc(doc(db, "rice_seed_variety", id));
+        await deleteDoc(doc(db, "rice_seed_varieties", id));
         setVarieties((prev) => prev.filter((v) => v.id !== id));
+
         setSuccessDelete(false);
       }, 1000);
     } catch (error) {

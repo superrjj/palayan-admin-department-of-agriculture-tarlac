@@ -1,10 +1,9 @@
-// components/DiseaseManagement/DiseaseManagement.jsx
 import React, { useState, useEffect } from 'react';
 import DiseaseHeader from './DiseaseHeader';
 import AddDiseaseModal from './AddDiseaseModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase/config";
+import { db } from "../../firebase/config";
+import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
 
 const DiseaseManagement = () => {
   const [diseases, setDiseases] = useState([]);
@@ -16,21 +15,21 @@ const DiseaseManagement = () => {
   const [successSave, setSuccessSave] = useState(false);
   const [successDelete, setSuccessDelete] = useState(false);
   const [saveAction, setSaveAction] = useState('');
-  const itemsPerPage = 50;
-
-  //states for custom delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState(null);
+  const [viewDisease, setViewDisease] = useState(null);
+
+  const itemsPerPage = 50;
 
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "rice_local_diseases"),
-      (snapshot) => {
+      snapshot => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setDiseases(data);
         setLoading(false);
       },
-      (error) => {
+      error => {
         console.error("Error fetching diseases:", error);
         setLoading(false);
       }
@@ -90,7 +89,6 @@ const DiseaseManagement = () => {
     setIsModalOpen(true);
   };
 
-  //Actual deletion logic
   const performDelete = async (id) => {
     try {
       setSuccessDelete(true);
@@ -102,13 +100,11 @@ const DiseaseManagement = () => {
     }
   };
 
-  // Open delete modal
   const openDeleteModal = (disease) => {
     setSelectedDisease({ id: disease.id, name: disease.name || 'Unnamed Disease' });
     setShowDeleteModal(true);
   };
 
-  //Confirm delete from modal
   const confirmDelete = async () => {
     if (!selectedDisease) return;
     await performDelete(selectedDisease.id);
@@ -116,7 +112,6 @@ const DiseaseManagement = () => {
     setSelectedDisease(null);
   };
 
-  //Cancel delete
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setSelectedDisease(null);
@@ -140,57 +135,52 @@ const DiseaseManagement = () => {
             </div>
           ) : (
             paginatedDiseases.map(disease => (
-              <div key={disease.id} className="border rounded-lg p-4 shadow hover:shadow-md transition">
-                {disease.mainImageUrl && (
-                  <img 
-                    src={disease.mainImageUrl} 
-                    alt={disease.name} 
-                    className="w-full h-40 object-cover rounded mb-3"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                )}
-                <h3 className="font-semibold text-lg">{disease.name || 'Unnamed Disease'}</h3>
-                {disease.scientificName && (
-                  <p className="text-sm italic text-gray-600">{disease.scientificName}</p>
-                )}
-                {disease.description && (
-                  <p className="text-gray-600 mt-2 text-sm">{disease.description}</p>
-                )}
+               <div 
+              key={disease.id} 
+              className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative"
+            >
+              {disease.mainImageUrl && (
+                <img 
+                  src={disease.mainImageUrl} 
+                  alt={disease.name} 
+                  className="w-full h-40 object-cover rounded mb-3"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+              <h3 className="font-semibold text-lg">{disease.name || 'Unnamed Disease'}</h3>
+              {disease.scientificName && <p className="text-sm italic text-gray-600">{disease.scientificName}</p>}
+              {disease.description && <p className="text-gray-600 mt-2 text-sm">{disease.description}</p>}
 
-                {/*Created & Last Updated display */}
-                <div className="mt-3 text-xs text-gray-500 space-y-1">
-                  <p>
-                    <span className="font-medium">Created Date:</span>{" "}
-                    {disease.createdAt?.toDate
-                      ? disease.createdAt.toDate().toLocaleString()
-                      : "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Last Updated:</span>{" "}
-                    {disease.updatedAt?.toDate
-                      ? disease.updatedAt.toDate().toLocaleString()
-                      : "-"}
-                  </p>
-                </div>
-
-                <div className="flex justify-between mt-3 space-x-2">
-                  <button 
-                    className="flex-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition" 
-                    onClick={() => handleEdit(disease)}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    className="flex-1 bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition" 
-                    onClick={() => openDeleteModal(disease)}
-                  >
-                    Delete
-                  </button>
-                </div>
+              <div className="mt-3 text-xs text-gray-500 space-y-1">
+                <p><span className="font-medium">Created Date:</span> {disease.createdAt?.toDate ? disease.createdAt.toDate().toLocaleString() : "N/A"}</p>
+                <p><span className="font-medium">Last Updated:</span> {disease.updatedAt?.toDate ? disease.updatedAt.toDate().toLocaleString() : "-"}</p>
               </div>
 
+              {/* Clickable icons */}
+           <div className="flex justify-center gap-2 mt-3">
+            <button
+              onClick={() => setViewDisease(disease)}
+              className="flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition"
+            >
+              <Eye className="w-4 h-4" /> View
+            </button>
+
+            <button
+              onClick={() => handleEdit(disease)}
+              className="flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
+            >
+              <Edit className="w-4 h-4" /> Edit
+            </button>
+
+            <button
+              onClick={() => openDeleteModal(disease)}
+              className="flex items-center justify-center gap-1 bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 transition"
+            >
+              <Trash className="w-4 h-4" /> Delete
+            </button>
+          </div>
+
+            </div>
             ))
           )}
         </div>
@@ -198,41 +188,10 @@ const DiseaseManagement = () => {
 
       {isModalOpen && (
         <AddDiseaseModal
-          onClose={() => { 
-            setIsModalOpen(false); 
-            setEditDisease(null); 
-          }}
+          onClose={() => { setIsModalOpen(false); setEditDisease(null); }}
           onSave={handleAddOrEditDisease}
           diseaseData={editDisease}
         />
-      )}
-
-      {successSave && (
-        <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl p-6 flex flex-col items-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-green-600">
-              Disease {saveAction} successfully!
-            </h3>
-          </div>
-        </div>
-      )}
-
-      {successDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-red-600">Disease deleted successfully!</h3>
-          </div>
-        </div>
       )}
 
       {/* Delete Confirm Modal */}
@@ -241,9 +200,7 @@ const DiseaseManagement = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3" />
-                </svg>
+                <X className="w-8 h-8 text-red-600" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-800">Delete Disease</h3>
@@ -261,9 +218,7 @@ const DiseaseManagement = () => {
                     onClick={confirmDelete}
                     className="px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm flex items-center gap-2"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3" />
-                    </svg>
+                    <Trash className="w-4 h-4" />
                     Delete
                   </button>
                 </div>
@@ -273,6 +228,53 @@ const DiseaseManagement = () => {
         </div>
       )}
 
+      {/* View Disease Card */}
+      {viewDisease && (
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setViewDisease(null)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+
+            <h2 className="text-2xl font-bold mb-4">{viewDisease.name || "Unnamed Disease"}</h2>
+
+            {viewDisease.mainImageUrl && (
+              <img
+                src={viewDisease.mainImageUrl}
+                alt={viewDisease.name}
+                className="w-full h-48 object-cover rounded-lg mb-4"
+              />
+            )}
+
+            <div className="space-y-3 text-gray-700">
+              {viewDisease.scientificName && <p><strong>Scientific Name:</strong> {viewDisease.scientificName}</p>}
+              {viewDisease.description && <p><strong>Description:</strong> {viewDisease.description}</p>}
+              {viewDisease.cause && <p><strong>Cause:</strong> {viewDisease.cause}</p>}
+              {viewDisease.symptoms && <p><strong>Symptoms:</strong> {viewDisease.symptoms}</p>}
+              {viewDisease.treatments && <p><strong>Treatments:</strong> {viewDisease.treatments}</p>}
+
+              <div className="flex flex-col text-gray-500 text-sm mt-2 space-y-1">
+                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Created: {viewDisease.createdAt?.toDate ? viewDisease.createdAt.toDate().toLocaleString() : "-"}</div>
+                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Updated: {viewDisease.updatedAt?.toDate ? viewDisease.updatedAt.toDate().toLocaleString() : "-"}</div>
+              </div>
+
+              {viewDisease.images && viewDisease.images.length > 0 && (
+                <div className="mt-3">
+                  <strong>Images:</strong>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    {viewDisease.images.map((img, idx) => (
+                      <img key={idx} src={img} alt={`img-${idx}`} className="w-full h-24 object-cover rounded" />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
