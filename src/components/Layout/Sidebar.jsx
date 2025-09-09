@@ -7,7 +7,7 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
   const location = useLocation();
 
   const menuItems = [
-    { id: '', label: 'Dashboard', icon: Home },   // <<-- changed '/' to ''
+    { id: '', label: 'Dashboard', icon: Home },   
     { id: 'varieties', label: 'Rice Varieties', icon: Wheat },
     { id: 'pests', label: 'Pest Management', icon: Bug },
     { id: 'diseases', label: 'Disease Management', icon: Shield },
@@ -30,11 +30,12 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
       >
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-              <Wheat className="h-5 w-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-gray-800">PalaYan</h1>
+          <div className="flex items-center space-x-7">
+          <img 
+            src="ic_palayan_no_bg.png" 
+            alt="Logo" 
+            className="h-11 w-11 object-contain"/>
+            <h1 className="text-xl font-bold text-green-700 flex items-center">PalaYan</h1>
           </div>
           <button
             onClick={() => setIsSidebarOpen(false)}

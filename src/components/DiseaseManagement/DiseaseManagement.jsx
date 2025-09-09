@@ -8,12 +8,20 @@ import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
 const DiseaseManagement = () => {
   const [diseases, setDiseases] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [currentPage, setCurrentPage] = useState(1);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editDisease, setEditDisease] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // eslint-disable-next-line no-unused-vars
   const [successSave, setSuccessSave] = useState(false);
+
+  // eslint-disable-next-line no-unused-vars
   const [successDelete, setSuccessDelete] = useState(false);
+
+  // eslint-disable-next-line no-unused-vars
   const [saveAction, setSaveAction] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState(null);

@@ -16,6 +16,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 

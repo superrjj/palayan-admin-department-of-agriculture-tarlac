@@ -9,6 +9,8 @@ import { db } from "../../firebase/config";
 const PestManagement = () => {
   const [pests, setPests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // eslint-disable-next-line no-unused-vars
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editPest, setEditPest] = useState(null);
@@ -45,6 +47,8 @@ const PestManagement = () => {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedPests = filteredPests.slice(startIndex, startIndex + itemsPerPage);
+
+  // eslint-disable-next-line no-unused-vars
   const totalPages = Math.ceil(filteredPests.length / itemsPerPage);
 
   const handleAddNew = () => {
@@ -95,7 +99,6 @@ const PestManagement = () => {
   const performDelete = async (id) => {
     try {
 
-      const deletedPest = pests.find((p) => p.id === id);
 
       setSuccessDelete(true);
       await deleteDoc(doc(db, "rice_local_pests", id));
