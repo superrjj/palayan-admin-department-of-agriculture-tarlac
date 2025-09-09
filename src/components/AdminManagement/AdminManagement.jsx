@@ -36,6 +36,7 @@ const AdminManagement = () => {
     return () => unsub();
   }, []);
 
+  // Update lastLogin for a user
   // eslint-disable-next-line no-unused-vars
   const updateLastLogin = async (userId) => {
     try {
