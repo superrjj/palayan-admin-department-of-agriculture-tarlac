@@ -34,7 +34,7 @@ const AdminDashboard = () => {
             <Route path="varieties" element={<RiceVarietiesManagement />} />
             <Route path="pests" element={<PestManagement />} />
             <Route path="diseases" element={<DiseaseManagement />} />
-            <Route path="admins" element={<AdminManagement />} />
+            <Route path="accounts" element={<AdminManagement />} />
           </Routes>
         </main>
       </div>
