@@ -30,7 +30,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     const files = Array.from(e.target.files);
     console.log("Selected files:", files);
     
-    if (files.length + images.length > 10) { // Reduced limit for testing
+    if (files.length + images.length > 1000) { // Reduced limit for testing
       alert("You can upload a maximum of 10 images.");
       return;
     }
@@ -240,7 +240,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-5 cursor-pointer hover:border-green-500 transition">
               <UploadCloud className="w-10 h-10 text-gray-400 mb-2" />
               <span className="text-gray-500 text-sm text-center">
-                Click or drag files here {isEdit ? "(Optional)" : "(Required - Max 10 images)"}
+                Click or drag files here {isEdit ? "(Optional)" : "(Required - Max 1000 images)"}
               </span>
               <input 
                 type="file" 
