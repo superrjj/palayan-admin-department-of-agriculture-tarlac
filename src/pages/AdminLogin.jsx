@@ -104,7 +104,7 @@ export default function AdminLogin() {
       {/* Login Card - Fixed size */}
       <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
         <div className="w-full max-w-sm">
-          <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden min-h-[550px]">
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden min-h-[550px]">
 
             {/* Header */}
             <div className="p-8 text-center border-b border-white/20">
