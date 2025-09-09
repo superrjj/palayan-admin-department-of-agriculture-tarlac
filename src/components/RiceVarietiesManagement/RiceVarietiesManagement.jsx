@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect} from 'react';
 import RiceVarietyHeader from '../RiceVarietiesManagement/RiceVarietyHeader';
 import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';

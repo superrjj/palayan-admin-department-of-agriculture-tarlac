@@ -52,6 +52,7 @@ const DiseaseManagement = () => {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedDiseases = filteredDiseases.slice(startIndex, startIndex + itemsPerPage);
+  // eslint-disable-next-line no-unused-vars
   const totalPages = Math.ceil(filteredDiseases.length / itemsPerPage);
 
   const handleAddNew = () => {
