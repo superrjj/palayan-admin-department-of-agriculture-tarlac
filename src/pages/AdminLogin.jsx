@@ -4,149 +4,156 @@ import { fetchUsers } from "../service/userService";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/config"; 
 import { User, Lock, Eye, EyeOff, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
+import { v4 as uuidv4 } from "uuid"; // <-- for single-session
 
 export default function AdminLogin() {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
-  const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+      const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
+      const [showPassword, setShowPassword] = useState(false);
+      const [errors, setErrors] = useState({});
+      const [isLoading, setIsLoading] = useState(false);
+      const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Forgot password states
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [fpStep, setFpStep] = useState(1); // 1 = username, 2 = question, 3 = new password
-  const [fpUsername, setFpUsername] = useState('');
-  const [securityQuestion, setSecurityQuestion] = useState('');
-  const [selectedQuestion, setSelectedQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fpError, setFpError] = useState('');
+      // Forgot password states
+      const [showForgotPassword, setShowForgotPassword] = useState(false);
+      const [fpStep, setFpStep] = useState(1);
+      const [fpUsername, setFpUsername] = useState('');
+      const [securityQuestion, setSecurityQuestion] = useState('');
+      const [selectedQuestion, setSelectedQuestion] = useState('');
+      const [answer, setAnswer] = useState('');
+      const [newPassword, setNewPassword] = useState('');
+      const [confirmPassword, setConfirmPassword] = useState('');
+      const [fpError, setFpError] = useState('');
 
-  // Live validation
-  useEffect(() => {
-    if (fpStep === 1 && fpUsername.trim() !== '') setFpError('');
-    if (fpStep === 2 && answer.trim() !== '') setFpError('');
-    if (fpStep === 3 && newPassword !== '' && confirmPassword !== '') setFpError('');
-  }, [fpUsername, answer, newPassword, confirmPassword, fpStep]);
+      // Live validation
+      useEffect(() => {
+        if (fpStep === 1 && fpUsername.trim() !== '') setFpError('');
+        if (fpStep === 2 && answer.trim() !== '') setFpError('');
+        if (fpStep === 3 && newPassword !== '' && confirmPassword !== '') setFpError('');
+      }, [fpUsername, answer, newPassword, confirmPassword, fpStep]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+      useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+      }, []);
 
+      const validateForm = () => {
+        const newErrors = {};
+        if (!formData.username.trim()) newErrors.username = 'Please enter your username or email';
+        if (!formData.password.trim()) newErrors.password = 'Please enter your password';
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+      };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.username.trim()) newErrors.username = 'Please enter your username or email';
-    if (!formData.password.trim()) newErrors.password = 'Please enter your password';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+      const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+        if (errors[name] || errors.submit) setErrors({});
+      };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    if (errors[name] || errors.submit) setErrors({});
-  };
+      const handleLogin = async () => {
+        if (!validateForm()) return;
 
-  const handleLogin = async () => {
-    if (!validateForm()) return;
+        setIsLoading(true);
+        setErrors({});
 
-    setIsLoading(true);
-    setErrors({});
-
-    try {
-      const users = await fetchUsers();
-      const user = users.find(
-        u => (u.username === formData.username || u.email === formData.username) &&
-             u.password === formData.password
-      );
-
-      if (user) {
         try {
-          await updateDoc(doc(db, "accounts", user.id), { lastLogin: new Date(), status: "active" });
-        } catch (err) { console.error("Failed to update lastLogin:", err); }
+          const users = await fetchUsers();
+          const user = users.find(
+            u => (u.username === formData.username || u.email === formData.username) &&
+                u.password === formData.password
+          );
 
-        localStorage.setItem("admin_token", user.id);
+          if (user) {
+            // ---------------- Single-session logic ----------------
+            const sessionId = uuidv4();
+            try {
+              await updateDoc(doc(db, "accounts", user.id), { 
+                lastLogin: new Date(), 
+                status: "active",
+                currentSession: sessionId // <-- new field
+              });
+            } catch (err) { console.error("Failed to update lastLogin:", err); }
 
-        setTimeout(() => {
-          navigate("/admin_dashboard");
+            localStorage.setItem("admin_token", user.id);
+            localStorage.setItem("session_id", sessionId); // save current session locally
+            // --------------------------------------------------------
+
+            setTimeout(() => {
+              navigate("/admin_dashboard");
+              setIsLoading(false);
+            }, 2000);
+          } else {
+            setErrors({ submit: "Invalid credentials. Please try again." });
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error("Login error:", err);
+          setErrors({ submit: "Something went wrong. Please try again later." });
           setIsLoading(false);
-        }, 2000);
-      } else {
-        setErrors({ submit: "Invalid credentials. Please try again." });
-        setIsLoading(false);
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      setErrors({ submit: "Something went wrong. Please try again later." });
-      setIsLoading(false);
-    }
-  };
+        }
+      };
 
-  const handleKeyDown = (e) => { if (e.key === 'Enter') handleLogin(); };
+      const handleKeyDown = (e) => { if (e.key === 'Enter') handleLogin(); };
 
-  // -------------------- Forgot Password Handlers --------------------
-  const handleFpNextUsername = async () => {
-    if (!fpUsername.trim()) return setFpError("Please enter username or email");
-    setFpError('');
-    try {
-      const users = await fetchUsers();
-      const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
-      if (!user) return setFpError('User not found');
-      setSecurityQuestion(user.securityQuestion);
-      setFpStep(2);
-    } catch {
-      setFpError('Something went wrong');
-    }
-  };
+      // -------------------- Forgot Password Handlers --------------------
+      const handleFpNextUsername = async () => {
+        if (!fpUsername.trim()) return setFpError("Please enter username or email");
+        setFpError('');
+        try {
+          const users = await fetchUsers();
+          const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
+          if (!user) return setFpError('User not found');
+          setSecurityQuestion(user.securityQuestion);
+          setFpStep(2);
+        } catch {
+          setFpError('Something went wrong');
+        }
+      };
 
-  const handleFpNextAnswer = async () => {
-    if (!answer.trim()) return setFpError("Please enter your answer");
-    setFpError('');
-    try {
-      const users = await fetchUsers();
-      const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
-      if (!user) return setFpError('User not found');
-      if (user.securityAnswer.toLowerCase() !== answer.toLowerCase()) return setFpError('Wrong answer');
-      setFpStep(3);
-    } catch {
-      setFpError('Something went wrong');
-    }
-  };
+      const handleFpNextAnswer = async () => {
+        if (!answer.trim()) return setFpError("Please enter your answer");
+        setFpError('');
+        try {
+          const users = await fetchUsers();
+          const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
+          if (!user) return setFpError('User not found');
+          if (user.securityAnswer.toLowerCase() !== answer.toLowerCase()) return setFpError('Wrong answer');
+          setFpStep(3);
+        } catch {
+          setFpError('Something went wrong');
+        }
+      };
 
-  const handleFpResetPassword = async () => {
-    if (!newPassword || !confirmPassword) return setFpError("Please fill both fields");
+      const handleFpResetPassword = async () => {
+        if (!newPassword || !confirmPassword) return setFpError("Please fill both fields");
 
-    // Password requirements check
-    const passwordChecks = {
-      length: newPassword.length >= 8,
-      uppercase: /[A-Z]/.test(newPassword),
-      number: /[0-9]/.test(newPassword),
-      special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
-    };
-    const invalidRules = Object.entries(passwordChecks).filter(([_, passed]) => !passed);
-    if (invalidRules.length > 0) return setFpError("Password does not meet all requirements");
+        const passwordChecks = {
+          length: newPassword.length >= 8,
+          uppercase: /[A-Z]/.test(newPassword),
+          number: /[0-9]/.test(newPassword),
+          special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+        };
+        const invalidRules = Object.entries(passwordChecks).filter(([_, passed]) => !passed);
+        if (invalidRules.length > 0) return setFpError("Password does not meet all requirements");
 
-    if (newPassword !== confirmPassword) return setFpError("Passwords don't match");
-    setFpError('');
-    try {
-      const users = await fetchUsers();
-      const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
-      if (!user) return setFpError('User not found');
-      await updateDoc(doc(db, "accounts", user.id), { password: newPassword });
-      alert('Password reset successfully!');
-      setShowForgotPassword(false);
-      setFpStep(1);
-      setFpUsername(''); setSecurityQuestion(''); setSelectedQuestion('');
-      setAnswer(''); setNewPassword(''); setConfirmPassword(''); setFpError('');
-    } catch {
-      setFpError('Something went wrong');
-    }
-  };
+        if (newPassword !== confirmPassword) return setFpError("Passwords don't match");
+        setFpError('');
+        try {
+          const users = await fetchUsers();
+          const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
+          if (!user) return setFpError('User not found');
+          await updateDoc(doc(db, "accounts", user.id), { password: newPassword });
+          alert('Password reset successfully!');
+          setShowForgotPassword(false);
+          setFpStep(1);
+          setFpUsername(''); setSecurityQuestion(''); setSelectedQuestion('');
+          setAnswer(''); setNewPassword(''); setConfirmPassword(''); setFpError('');
+        } catch {
+          setFpError('Something went wrong');
+        }
+      };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
