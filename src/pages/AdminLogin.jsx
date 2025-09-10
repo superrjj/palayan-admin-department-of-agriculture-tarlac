@@ -37,11 +37,6 @@ export default function AdminLogin() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (localStorage.getItem("admin_token")) {
-      navigate("/admin_dashboard");
-    }
-  }, [navigate]);
 
   const validateForm = () => {
     const newErrors = {};
