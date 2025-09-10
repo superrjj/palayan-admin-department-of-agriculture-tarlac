@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+
 // 🔑 galing ito sa Firebase Console mo
 const firebaseConfig = {
   apiKey: "AIzaSyDoH4hu-jKw1-GoVR7rv60sH6Ob1L0LT6w",
@@ -20,3 +21,4 @@ export const db = getFirestore(app);
 
 // Firebase Storage instance
 export const storage = getStorage(app);
+

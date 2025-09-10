@@ -31,10 +31,10 @@ const AdminDashboard = () => {
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route index element={<Dashboard />} />
-            <Route path="varieties" element={<RiceVarietiesManagement />} />
-            <Route path="pests" element={<PestManagement />} />
-            <Route path="diseases" element={<DiseaseManagement />} />
-            <Route path="admins" element={<AdminManagement />} />
+            <Route path="rice_varieties" element={<RiceVarietiesManagement />} />
+            <Route path="rice_pests" element={<PestManagement />} />
+            <Route path="rice_diseases" element={<DiseaseManagement />} />
+            <Route path="accounts" element={<AdminManagement />} />
           </Routes>
         </main>
       </div>

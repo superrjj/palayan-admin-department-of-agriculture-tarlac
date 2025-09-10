@@ -8,10 +8,10 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
 
   const menuItems = [
     { id: '', label: 'Dashboard', icon: Home },   
-    { id: 'varieties', label: 'Rice Varieties', icon: Wheat },
-    { id: 'pests', label: 'Pest Management', icon: Bug },
-    { id: 'diseases', label: 'Disease Management', icon: Shield },
-    { id: 'admins', label: 'Admin Management', icon: Users },
+    { id: 'rice_varieties', label: 'Rice Varieties', icon: Wheat },
+    { id: 'rice_pests', label: 'Pest Management', icon: Bug },
+    { id: 'rice_diseases', label: 'Disease Management', icon: Shield },
+    { id: 'accounts', label: 'Admin Management', icon: Users },
   ];
 
   return (
@@ -29,7 +29,7 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
         } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-300">
           <div className="flex items-center space-x-7">
           <img 
             src="ic_palayan_no_bg.png" 
