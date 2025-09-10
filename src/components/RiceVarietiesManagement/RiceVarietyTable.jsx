@@ -59,7 +59,7 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
                     <td className="px-6 py-4 flex justify-center space-x-2">
                       <button
                         onClick={() => setSelectedVariety(variety)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
