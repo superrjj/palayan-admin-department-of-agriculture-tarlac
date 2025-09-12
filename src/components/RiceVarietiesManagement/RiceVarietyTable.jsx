@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, X, Calendar, MapPin, BarChart2, Edit2, Trash2, Layers } from "lucide-react";
+import { Eye, X, Calendar, MapPin, BarChart2, Edit2, Trash2, Layers, Wheat } from "lucide-react";
 
 const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, totalPages, setCurrentPage }) => {
   const [selectedVariety, setSelectedVariety] = useState(null);
@@ -43,7 +43,7 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
                 <tr>
                   <td colSpan="6" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
-                      <Eye className="w-16 h-16 text-gray-300 mb-4" />
+                      <Wheat className="w-16 h-16 text-gray-300 mb-4" />
                       <p className="text-gray-500 text-lg">No rice variety found</p>
                     </div>
                   </td>

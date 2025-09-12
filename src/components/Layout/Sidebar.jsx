@@ -1,7 +1,7 @@
 // components/Layout/Sidebar.jsx
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Home, Wheat, Bug, Shield, Users, X } from 'lucide-react';
+import { Home, Wheat, Bug, Shield, Users, X, History } from 'lucide-react';
 
 const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
   const location = useLocation();
@@ -12,6 +12,7 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
     { id: 'rice_pests', label: 'Pest Management', icon: Bug },
     { id: 'rice_diseases', label: 'Disease Management', icon: Shield },
     { id: 'accounts', label: 'Admin Management', icon: Users },
+    { id: 'history_logs', label: 'History Management', icon: History},
   ];
 
   return (

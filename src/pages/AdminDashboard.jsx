@@ -7,6 +7,7 @@ import RiceVarietiesManagement from "../components/RiceVarietiesManagement/RiceV
 import PestManagement from "../components/PestManagement/PestManagement";
 import DiseaseManagement from "../components/DiseaseManagement/DiseaseManagement";
 import AdminManagement from "../components/AdminManagement/AdminManagement";
+import History from "../components/HistoryManagement/History";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 
@@ -14,7 +15,7 @@ const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
-  // ---------------- Auto-logout logic ----------------
+  //Auto-logout logic 
   useEffect(() => {
     const logout = () => {
       localStorage.removeItem("admin_token");
@@ -22,7 +23,7 @@ const AdminDashboard = () => {
       navigate("/admin_login");
     };
 
-    // ---------------- Inactivity logout ----------------
+    //Inactivity logout 
     let inactivityTimer = setTimeout(logout, 10 * 60 * 1000); // 10 mins
 
     const resetTimer = () => {
@@ -44,7 +45,7 @@ const AdminDashboard = () => {
     };
   }, [navigate]);
 
-  // ---------------- Single-session validation ----------------
+  // Single-session validation
   useEffect(() => {
     const checkSession = async () => {
       const token = localStorage.getItem("admin_token");
@@ -86,6 +87,7 @@ const AdminDashboard = () => {
             <Route path="rice_pests" element={<PestManagement />} />
             <Route path="rice_diseases" element={<DiseaseManagement />} />
             <Route path="accounts" element={<AdminManagement />} />
+            <Route path="history_logs" element={<History />} />
           </Routes>
         </main>
       </div>
