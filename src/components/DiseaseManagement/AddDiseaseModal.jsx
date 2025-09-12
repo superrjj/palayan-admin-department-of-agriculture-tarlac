@@ -30,7 +30,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     const files = Array.from(e.target.files);
     console.log("Selected files:", files);
     
-    if (files.length + images.length > 1000) { //reduced limit for testing
+    if (files.length + images.length > 1000) { //Reduced limit for testing
       alert("You can upload a maximum of 1000 images.");
       return;
     }
