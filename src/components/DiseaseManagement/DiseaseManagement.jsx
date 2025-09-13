@@ -135,7 +135,7 @@ const DiseaseManagement = () => {
       />
 
       {loading ? (
-        <div className="text-center py-8">Loading diseases...</div>
+        <div className="text-center py-8">Loading rice diseases...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
           {paginatedDiseases.length === 0 ? (
@@ -277,65 +277,65 @@ const DiseaseManagement = () => {
             <div className="space-y-3 text-gray-700">
               {viewDisease.scientificName && <p><strong>Scientific Name:</strong> {viewDisease.scientificName}</p>}
               {viewDisease.description && (
-    <p>
-      <strong>Description:</strong> 
-      <span 
-        className="block mt-1"
-        style={{ 
-          textAlign: 'justify', 
-          textJustify: 'inter-word',
-          hyphens: 'auto'
-        }}
-      >
-        {viewDisease.description}
-      </span>
-    </p>
-  )}
-  {viewDisease.cause && (
-    <p>
-      <strong>Cause:</strong> 
-      <span 
-        className="block mt-1"
-        style={{ 
-          textAlign: 'justify', 
-          textJustify: 'inter-word',
-          hyphens: 'auto'
-        }}
-      >
-        {viewDisease.cause}
-      </span>
-    </p>
-  )}
-  {viewDisease.symptoms && (
-    <p>
-      <strong>Symptoms:</strong> 
-      <span 
-        className="block mt-1"
-        style={{ 
-          textAlign: 'justify', 
-          textJustify: 'inter-word',
-          hyphens: 'auto'
-        }}
-      >
-        {viewDisease.symptoms}
-      </span>
-    </p>
-  )}
-  {viewDisease.treatments && (
-    <p>
-      <strong>Treatments:</strong> 
-      <span 
-        className="block mt-1"
-        style={{ 
-          textAlign: 'justify', 
-          textJustify: 'inter-word',
-          hyphens: 'auto'
-        }}
-      >
-        {viewDisease.treatments}
-      </span>
-    </p>
-  )}
+              <p>
+                <strong>Description:</strong> 
+                <span 
+                  className="block mt-1"
+                  style={{ 
+                    textAlign: 'justify', 
+                    textJustify: 'inter-word',
+                    hyphens: 'auto'
+                  }}
+                >
+                  {viewDisease.description}
+                </span>
+              </p>
+            )}
+            {viewDisease.cause && (
+              <p>
+                <strong>Cause:</strong> 
+                <span 
+                  className="block mt-1"
+                  style={{ 
+                    textAlign: 'justify', 
+                    textJustify: 'inter-word',
+                    hyphens: 'auto'
+                  }}
+                >
+                  {viewDisease.cause}
+                </span>
+              </p>
+            )}
+            {viewDisease.symptoms && (
+              <p>
+                <strong>Symptoms:</strong> 
+                <span 
+                  className="block mt-1"
+                  style={{ 
+                    textAlign: 'justify', 
+                    textJustify: 'inter-word',
+                    hyphens: 'auto'
+                  }}
+                >
+                  {viewDisease.symptoms}
+                </span>
+              </p>
+            )}
+            {viewDisease.treatments && (
+              <p>
+                <strong>Treatments:</strong> 
+                <span 
+                  className="block mt-1"
+                  style={{ 
+                    textAlign: 'justify', 
+                    textJustify: 'inter-word',
+                    hyphens: 'auto'
+                  }}
+                >
+                  {viewDisease.treatments}
+                </span>
+              </p>
+            )}
 
               <div className="flex flex-col text-gray-500 text-sm mt-2 space-y-1">
                 <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Created: {viewDisease.createdAt?.toDate ? viewDisease.createdAt.toDate().toLocaleString() : "-"}</div>

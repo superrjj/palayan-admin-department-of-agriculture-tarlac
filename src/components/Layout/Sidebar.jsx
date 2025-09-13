@@ -1,10 +1,10 @@
-// components/Layout/Sidebar.jsx
-import React from 'react';
+import React, { useState, useEffect  } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Home, Wheat, Bug, Shield, Users, X, History } from 'lucide-react';
+import { Home, Wheat, Bug, Shield, Users, X, History, Menu } from 'lucide-react';
 
 const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
   const location = useLocation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const menuItems = [
     { id: '', label: 'Dashboard', icon: Home },   
@@ -14,6 +14,12 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
     { id: 'accounts', label: 'Admin Management', icon: Users },
     { id: 'history_logs', label: 'History Management', icon: History},
   ];
+
+  useEffect(() => {
+     if (isSidebarOpen) {
+       setIsSidebarCollapsed(false);
+     }
+   }, [isSidebarOpen]);
 
   return (
     <>
@@ -27,23 +33,35 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
       <div
         className={`${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
+        } fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+          isSidebarCollapsed ? 'lg:w-16' : 'w-64'
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-300">
-          <div className="flex items-center space-x-7">
-          <img 
-            src="ic_palayan_no_bg.png" 
-            alt="Logo" 
-            className="h-11 w-11 object-contain"/>
-            <h1 className="text-xl font-bold text-green-700 flex items-center">PalaYan</h1>
+          {!isSidebarCollapsed && (
+            <div className="flex items-center space-x-7">
+              <img 
+                src="/ic_palayan_no_bg.png" 
+                alt="Logo" 
+                className="h-11 w-11 object-contain"/>
+              <h1 className="text-xl font-bold text-green-700 flex items-center">PalaYan</h1>
+            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden lg:block text-gray-500 hover:text-gray-700 p-1 rounded"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden text-gray-500 hover:text-gray-700"
-          >
-            <X className="h-6 w-6" />
-          </button>
         </div>
 
         {/* Menu */}
@@ -57,28 +75,36 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center px-4 py-3 rounded-lg text-left transition-colors
+                className={`w-full flex items-center rounded-lg transition-colors
+                  ${
+                    isSidebarCollapsed 
+                      ? 'justify-center px-2 py-3' 
+                      : 'px-4 py-3 text-left'
+                  }
                   ${
                     isActive
                       ? 'bg-green-100 text-green-700 font-medium hover:bg-green-200'
                       : 'text-black hover:text-green-700 hover:bg-green-100'
                   } focus:outline-none focus:ring-0`}
+                title={isSidebarCollapsed ? item.label : ''}
               >
-                <IconComponent className="h-5 w-5 mr-3" />
-                {item.label}
+                <IconComponent className={`h-5 w-5 ${!isSidebarCollapsed ? 'mr-3' : ''}`} />
+                {!isSidebarCollapsed && item.label}
               </button>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <div className="text-xs text-gray-500 text-center">
-            PalaYan
-            <br />
-            Version 1.0.0
+        {!isSidebarCollapsed && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+            <div className="text-xs text-gray-500 text-center">
+              PalaYan
+              <br />
+              Version 1.0.0
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
