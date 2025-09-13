@@ -11,8 +11,8 @@ const Header = ({ setIsSidebarOpen }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
 
-  const menuRef = useRef(null);
-  const buttonRef = useRef(null);
+  const menuRef = useRef(null); // ref lang sa dropdown
+  const buttonRef = useRef(null); // ref sa toggle button
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -27,6 +27,7 @@ const Header = ({ setIsSidebarOpen }) => {
     fetchUserData();
   }, []);
 
+  // Close menu kapag nag-click kahit saang parte ng screen maliban sa menu at toggle button
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -74,7 +75,7 @@ const Header = ({ setIsSidebarOpen }) => {
         <div className="flex items-center space-x-4 ml-auto">
           <div className="relative">
             <button
-              ref={buttonRef}
+              ref={buttonRef} // ref sa toggle button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center space-x-3 text-green-700 hover:text-green-900 p-2 rounded-lg hover:bg-green-100"
             >
@@ -102,7 +103,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
             {showProfileMenu && (
               <div
-                ref={menuRef}
+                ref={menuRef} // ref lang sa dropdown
                 className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
               >
                 <div className="py-2">
