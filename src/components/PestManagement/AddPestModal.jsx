@@ -173,7 +173,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
                       name={field}
                       value={formData[field]}
                       onChange={handleChange}
-                      className="w-full p-2 outline-none resize-none"
+                      className="w-full p-2 outline-none resize-none text-justify"
                       placeholder={`Enter ${label}`}
                       rows={3}
                       disabled={uploading}

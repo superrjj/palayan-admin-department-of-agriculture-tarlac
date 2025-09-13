@@ -162,7 +162,21 @@ const PestManagement = () => {
                   <p className="text-sm italic text-gray-600">{pest.scientificName}</p>
                 )}
                 {pest.description && (
-                  <p className="text-gray-600 mt-2 text-sm">{pest.description}</p>
+                  <p 
+                    className="text-gray-600 mt-2 text-sm overflow-hidden"
+                    style={{ 
+                      textAlign: 'justify', 
+                      textJustify: 'inter-word',
+                      hyphens: 'auto',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: '1.4em',
+                      maxHeight: '4.2em'
+                    }}
+                  >
+                    {pest.description}
+                  </p>
                 )}
 
                 <div className="mt-3 text-xs text-gray-500 space-y-1">
