@@ -17,11 +17,11 @@ const HistoryHeader = ({
   isLoading,
   totalLogs,
   filteredLogs,
-  users = []
+  users = [],
+  collections = [],
+  actions = []
 }) => {
-  const collections = ['accounts', 'rice_local_diseases', 'rice_local_pests', 'rice_local_varieties'];
-  const actions = ['CREATE', 'UPDATE', 'DELETE'];
-
+  
   const formatCollectionName = (collection) => {
     switch (collection) {
       case 'accounts': return 'User Accounts';
