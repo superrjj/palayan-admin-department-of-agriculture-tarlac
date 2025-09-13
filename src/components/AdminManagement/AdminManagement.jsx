@@ -2,9 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AdminHeader from '../AdminManagement/AdminHeader';
 import AdminTable from '../AdminManagement/AdminTable';
 import AddAdminModal from '../AdminManagement/AddAdminModal'; 
-import { addDoc, collection, onSnapshot, updateDoc, doc , deleteDoc } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
-
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]); 
@@ -14,17 +13,88 @@ const AdminManagement = () => {
   const [editAdmin, setEditAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
   const [successDelete, setSuccessDelete] = useState(false);
+  const [currentUser, setCurrentUser] = useState({
+    id: 'default_user',
+    fullname: 'System User',
+    username: 'system',
+    email: 'system@example.com'
+  });
   const itemsPerPage = 50;
 
-  // Realtime fetch admins from Firestore
+  // Get current user from localStorage and Firestore
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, "accounts"),
+    const getCurrentUser = async () => {
+      try {
+        const adminToken = localStorage.getItem("admin_token");
+        const sessionId = localStorage.getItem("session_id");
+        
+        if (adminToken && sessionId) {
+          const userDoc = await getDoc(doc(db, "accounts", adminToken));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Verify session
+            if (userData.currentSession === sessionId) {
+              setCurrentUser({
+                id: userData.id || adminToken,
+                fullname: userData.fullname || 'Unknown User',
+                username: userData.username || 'unknown',
+                email: userData.email || 'unknown@example.com'
+              });
+              console.log("Current user loaded:", userData.fullname);
+            } else {
+              console.log("Session mismatch, using default user");
+            }
+          } else {
+            console.log("User document not found, using default user");
+          }
+        } else {
+          console.log("No admin token or session, using default user");
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  // Realtime fetch admins from Firestore (only non-deleted)
+  useEffect(() => {
+    console.log("Setting up Firestore listener for admins...");
+    
+    // Try different query approaches
+    let q;
+    try {
+      // First try: documents where isDeleted is explicitly false
+      q = query(
+        collection(db, "accounts"),
+        where("isDeleted", "==", false)
+      );
+      console.log("Using query with isDeleted == false");
+    } catch (error) {
+      console.log("Query with isDeleted == false failed, trying alternative...");
+      // Fallback: get all documents and filter in JavaScript
+      q = collection(db, "accounts");
+      console.log("Using fallback query (all documents)");
+    }
+    
+    const unsub = onSnapshot(q, 
       (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
+        console.log("Snapshot received, docs count:", snapshot.docs.length);
+        
+        let data = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        
+        // If we used the fallback query, filter out deleted items
+        if (q.type === 'collection') {
+          data = data.filter(item => item.isDeleted !== true);
+          console.log("Filtered out deleted items, remaining:", data.length);
+        }
+        
+        console.log("Final admins count:", data.length);
+        console.log("Admins data:", data);
+        
         setAdmins(data);
         setLoading(false);
       },
@@ -33,7 +103,11 @@ const AdminManagement = () => {
         setLoading(false);
       }
     );
-    return () => unsub();
+    
+    return () => {
+      console.log("Cleaning up Firestore listener");
+      unsub();
+    };
   }, []);
 
   // Update lastLogin for a user
@@ -96,57 +170,135 @@ const AdminManagement = () => {
 
   const handleAddOrEditAdmin = async (adminData, id) => {
     try {
+      console.log("Current user when saving:", currentUser);
+      console.log("Admin data to save:", adminData);
+      
       if (id) {
-        await updateDoc(doc(db, "accounts", id), {
+        // Get the current data before updating
+        const currentAdmin = admins.find(a => a.id === id);
+        
+        const updateData = {
           ...adminData,
+          isDeleted: false, // Ensure it's not deleted
           updatedAt: new Date(),
+        };
+        
+        console.log("Updating admin with data:", updateData);
+        
+        await updateDoc(doc(db, "accounts", id), updateData);
+
+        // Log the update action
+        await addDoc(collection(db, "audit_logs"), {
+          userId: currentUser.id,
+          userName: currentUser.fullname,
+          userEmail: currentUser.email,
+          timestamp: new Date(),
+          action: 'UPDATE',
+          collection: 'accounts',
+          documentId: id,
+          documentName: adminData.fullname || adminData.username || 'Unknown',
+          description: 'Updated admin account',
+          changes: {
+            before: currentAdmin,
+            after: updateData
+          }
         });
-
-
+        
       } else {
-        await addDoc(collection(db, "accounts"), {
+        const newAdminData = {
           ...adminData,
           status: "active",
+          isDeleted: false, // Explicitly set as not deleted
           createdAt: new Date(),
           lastLogin: null,
-        });
+        };
 
+        console.log("Creating new admin with data:", newAdminData);
+
+        const docRef = await addDoc(collection(db, "accounts"), newAdminData);
+        
+        console.log("New admin created with ID:", docRef.id);
+
+        // Log the create action
+        await addDoc(collection(db, "audit_logs"), {
+          userId: currentUser.id,
+          userName: currentUser.fullname,
+          userEmail: currentUser.email,
+          timestamp: new Date(),
+          action: 'CREATE',
+          collection: 'accounts',
+          documentId: docRef.id,
+          documentName: adminData.fullname || adminData.username || 'Unknown',
+          description: 'Added new admin account',
+          changes: {
+            before: null,
+            after: newAdminData
+          }
+        });
       }
+      
+      console.log("Admin saved successfully");
       setIsModalOpen(false);
       setEditAdmin(null);
     } catch (error) {
       console.error("Error saving admin:", error);
+      alert("Error saving admin: " + error.message);
     }
   };
 
   const handleEdit = (admin) => {
+    console.log("Editing admin:", admin);
     setEditAdmin(admin);
     setIsModalOpen(true);
   };
 
-    const handleDelete = async (id) => {
-  try {
-    // Show success animation first
-    setSuccessDelete(true);
+  const handleDelete = async (id) => {
+    try {
+      console.log("Deleting admin with ID:", id);
+      setSuccessDelete(true);
 
-    setTimeout(async () => {
-      // Delete from Firestore
-      await deleteDoc(doc(db, "accounts", id));
+      // Get the admin data before soft delete
+      const adminToDelete = admins.find(a => a.id === id);
+      console.log("Admin to delete:", adminToDelete);
 
-      // Update UI
-      setAdmins((prev) => prev.filter((a) => a.id !== id));
+      setTimeout(async () => {
+        console.log("Current user when deleting:", currentUser);
+        
+        // Soft delete - update with isDeleted flag instead of actual delete
+        await updateDoc(doc(db, "accounts", id), {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: currentUser.id
+        });
+        
+        console.log("Admin soft deleted successfully");
+        
+        // Log the delete action
+        await addDoc(collection(db, "audit_logs"), {
+          userId: currentUser.id,
+          userName: currentUser.fullname,
+          userEmail: currentUser.email,
+          timestamp: new Date(),
+          action: 'DELETE',
+          collection: 'accounts',
+          documentId: id,
+          documentName: adminToDelete?.fullname || adminToDelete?.username || 'Unknown',
+          description: 'Deleted admin account',
+          changes: {
+            before: adminToDelete,
+            after: null
+          }
+        });
 
-      // Hide animation
-      setSuccessDelete(false);
-
-      console.log(`Admin ${id} has been deleted.`);
-    }, 1000); // 1 second delay para makita dialog first
-  } catch (error) {
-    console.error("Failed to delete admin:", error);
-  }
-};
-
-
+        // Remove from local state
+        setAdmins((prev) => prev.filter((a) => a.id !== id));
+        setSuccessDelete(false);
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to delete admin:", error);
+      alert("Error deleting admin: " + error.message);
+    }
+  };
 
   return (
     <div className="p-4 lg:p-6">
@@ -178,17 +330,16 @@ const AdminManagement = () => {
       )}
 
       {/* Success Delete Animation */}
-    {successDelete && (
-      <div className="fixed inset-0 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
-          <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          <h3 className="text-lg font-semibold text-green-600">Account deleted successfully!</h3>
+      {successDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
+            <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <h3 className="text-lg font-semibold text-green-600">Admin account deleted successfully!</h3>
+          </div>
         </div>
-      </div>
-    )}
-    
+      )}
     </div>
   );
 };
