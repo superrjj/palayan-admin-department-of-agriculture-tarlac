@@ -9,7 +9,7 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     password: adminData?.password || "",
     securityQuestion: adminData?.securityQuestion || "",
     securityAnswer: adminData?.securityAnswer || "",
-    role: adminData?.role || "admin",
+    role: adminData?.role || "ADMIN",
   });
 
   const [success, setSuccess] = useState(false);
@@ -185,8 +185,8 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
               disabled={isEdit} // cannot edit role
             >
-              <option value="super admin">Super Admin</option>
-              <option value="admin">Admin</option>
+              <option value="SYSTEM_ADMIN">System Admin</option>
+              <option value="ADMIN">Admin</option>
             </select>
           </div>
 

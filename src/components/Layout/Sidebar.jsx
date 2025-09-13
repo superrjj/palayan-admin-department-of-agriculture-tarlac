@@ -1,6 +1,6 @@
 import React, { useState, useEffect  } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Home, Wheat, Bug, Shield, Users, X, History, Menu } from 'lucide-react';
+import { Home, Wheat, Bug, Shield, Users, X, History, Menu, File } from 'lucide-react';
 
 const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
   const location = useLocation();
@@ -9,10 +9,11 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
   const menuItems = [
     { id: '', label: 'Dashboard', icon: Home },   
     { id: 'rice_varieties', label: 'Rice Varieties', icon: Wheat },
-    { id: 'rice_pests', label: 'Pest Management', icon: Bug },
-    { id: 'rice_diseases', label: 'Disease Management', icon: Shield },
-    { id: 'accounts', label: 'Admin Management', icon: Users },
-    { id: 'history_logs', label: 'History Management', icon: History},
+    { id: 'rice_pests', label: 'Pest', icon: Bug },
+    { id: 'rice_diseases', label: 'Rice Disease', icon: Shield },
+    { id: 'accounts', label: 'Accounts', icon: Users },
+    { id: 'history_logs', label: 'History Logs', icon: History},
+    { id: 'file_maintenance', label: 'File Maintenance', icon: File}
   ];
 
   useEffect(() => {

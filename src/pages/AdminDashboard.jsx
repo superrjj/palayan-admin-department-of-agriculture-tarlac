@@ -8,6 +8,7 @@ import PestManagement from "../components/PestManagement/PestManagement";
 import DiseaseManagement from "../components/DiseaseManagement/DiseaseManagement";
 import AdminManagement from "../components/AdminManagement/AdminManagement";
 import History from "../components/HistoryManagement/History";
+import FileMaintenance from "../components/FileMaintenanceManagement/FileMaintenance"
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 
@@ -88,6 +89,7 @@ const AdminDashboard = () => {
             <Route path="rice_diseases" element={<DiseaseManagement />} />
             <Route path="accounts" element={<AdminManagement />} />
             <Route path="history_logs" element={<History />} />
+            <Route path="file_maintenance" element={<FileMaintenance />} />
           </Routes>
         </main>
       </div>
