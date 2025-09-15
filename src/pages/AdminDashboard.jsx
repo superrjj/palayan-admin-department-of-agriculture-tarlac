@@ -1,5 +1,7 @@
+// src/pages/AdminDashboard.jsx
+import { useRole } from "../contexts/RoleContext";
 import React, { useState, useEffect } from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import Header from "../components/Layout/Header";
 import Sidebar from "../components/Layout/Sidebar";
 import Dashboard from "../components/Dashboard/Dashboard";
@@ -8,25 +10,23 @@ import PestManagement from "../components/PestManagement/PestManagement";
 import DiseaseManagement from "../components/DiseaseManagement/DiseaseManagement";
 import AdminManagement from "../components/AdminManagement/AdminManagement";
 import History from "../components/HistoryManagement/History";
-import FileMaintenance from "../components/FileMaintenanceManagement/FileMaintenance"
+import FileMaintenance from "../components/FileMaintenanceManagement/FileMaintenance";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 
 const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const { userRole, loading, isSystemAdmin } = useRole();
 
-  //Auto-logout logic 
   useEffect(() => {
     const logout = () => {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("session_id");
-      navigate("/admin_login");
+      navigate("/login");
     };
 
-    //Inactivity logout 
-    let inactivityTimer = setTimeout(logout, 10 * 60 * 1000); // 10 mins
-
+    let inactivityTimer = setTimeout(logout, 10 * 60 * 1000);
     const resetTimer = () => {
       clearTimeout(inactivityTimer);
       inactivityTimer = setTimeout(logout, 10 * 60 * 1000);
@@ -46,13 +46,12 @@ const AdminDashboard = () => {
     };
   }, [navigate]);
 
-  // Single-session validation
   useEffect(() => {
     const checkSession = async () => {
       const token = localStorage.getItem("admin_token");
       const sessionId = localStorage.getItem("session_id");
       if (!token || !sessionId) {
-        navigate("/admin_login");
+        navigate("/login");
         return;
       }
 
@@ -60,19 +59,32 @@ const AdminDashboard = () => {
       if (!userDoc.exists() || userDoc.data().currentSession !== sessionId) {
         localStorage.removeItem("admin_token");
         localStorage.removeItem("session_id");
-        navigate("/admin_login");
+        navigate("/login");
       }
     };
 
-    const interval = setInterval(checkSession, 5000); // check every 5s
+    const interval = setInterval(checkSession, 5000);
     return () => clearInterval(interval);
   }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (!userRole) {
+    navigate("/login");
+    return null;
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar
         onNavigate={(path) => {
-          navigate(`/admin_dashboard/${path}`);
+          navigate(`/dashboard/${path}`);
           setIsSidebarOpen(false);
         }}
         isSidebarOpen={isSidebarOpen}
@@ -87,9 +99,15 @@ const AdminDashboard = () => {
             <Route path="rice_varieties" element={<RiceVarietiesManagement />} />
             <Route path="rice_pests" element={<PestManagement />} />
             <Route path="rice_diseases" element={<DiseaseManagement />} />
-            <Route path="accounts" element={<AdminManagement />} />
+            <Route
+              path="accounts"
+              element={isSystemAdmin() ? <AdminManagement /> : <Navigate to="/dashboard" replace />}
+            />
             <Route path="history_logs" element={<History />} />
-            <Route path="file_maintenance" element={<FileMaintenance />} />
+            <Route
+              path="file_maintenance"
+              element={isSystemAdmin() ? <FileMaintenance /> : <Navigate to="/dashboard" replace />}
+            />
           </Routes>
         </main>
       </div>

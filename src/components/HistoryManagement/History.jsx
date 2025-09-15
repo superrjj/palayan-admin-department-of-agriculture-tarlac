@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Eye, Edit, Trash2, Plus, Clock, Database, Activity, User } from 'lucide-react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useRole } from '../../contexts/RoleContext';
 import { db } from '../../firebase/config';
 import HistoryHeader from './HistoryHeader';
 
@@ -12,36 +13,49 @@ const History = () => {
   const [selectedUser, setSelectedUser] = useState('ALL');
   const [dateRange, setDateRange] = useState('ALL');
   const [expandedLog, setExpandedLog] = useState(null);
+  const { userInfo, isSystemAdmin } = useRole();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch audit logs from Firestore
+  // FIXED: Complete fetchLogs function with proper query execution
   useEffect(() => {
-    setIsLoading(true);
-    
-    const q = query(
-      collection(db, "audit_logs"),
-      orderBy("timestamp", "desc")
-    );
-    
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        console.log("Audit logs loaded:", data.length);
-        console.log("Sample actions:", data.slice(0, 10).map(log => log.action));
-        setAuditLogs(data);
-        setIsLoading(false);
-      }, 
-      (error) => {
-        console.error("Error fetching audit logs:", error);
-        setIsLoading(false);
+    const fetchLogs = () => {
+      let q;
+      
+      if (isSystemAdmin()) {
+        // System Admin can see all logs
+        q = query(collection(db, "audit_logs"), orderBy("timestamp", "desc"));
+      } else {
+        // Regular Admin can only see their own logs
+        q = query(
+          collection(db, "audit_logs"),
+          where("userId", "==", userInfo?.id),
+          orderBy("timestamp", "desc")
+        );
       }
-    );
+      
+      return onSnapshot(q, 
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          console.log("Audit logs loaded:", data.length);
+          console.log("Sample actions:", data.slice(0, 10).map(log => log.action));
+          setAuditLogs(data);
+          setIsLoading(false);
+        }, 
+        (error) => {
+          console.error("Error fetching audit logs:", error);
+          setIsLoading(false);
+        }
+      );
+    };
     
-    return unsubscribe;
-  }, []);
+    if (userInfo?.id) {
+      const unsubscribe = fetchLogs();
+      return () => unsubscribe();
+    }
+  }, [userInfo?.id, isSystemAdmin]);
 
   // Get unique collections from actual data
   const collections = useMemo(() => {

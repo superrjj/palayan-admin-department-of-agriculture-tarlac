@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+// components/Header.jsx
+import React, { useEffect, useRef, useState } from 'react';
 import { Menu, Settings, LogOut, User, ChevronDown } from 'lucide-react';
 import { db } from '../../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const Header = ({ setIsSidebarOpen }) => {
@@ -11,8 +12,8 @@ const Header = ({ setIsSidebarOpen }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
 
-  const menuRef = useRef(null); // ref lang sa dropdown
-  const buttonRef = useRef(null); // ref sa toggle button
+  const menuRef = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -27,7 +28,6 @@ const Header = ({ setIsSidebarOpen }) => {
     fetchUserData();
   }, []);
 
-  // Close menu kapag nag-click kahit saang parte ng screen maliban sa menu at toggle button
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -50,20 +50,34 @@ const Header = ({ setIsSidebarOpen }) => {
     return initials[0] + (initials.length > 1 ? initials[initials.length - 1] : '');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoggingOut(true);
-    setTimeout(() => {
+    try {
+      const userId = localStorage.getItem('admin_token');
+      if (userId) {
+        // Do not set status to 'inactive' on logout
+        await updateDoc(doc(db, 'accounts', userId), {
+          currentSession: null,
+          lastLogoutAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error('Error clearing session:', error);
+    } finally {
       localStorage.removeItem('admin_token');
-      setIsLoggingOut(false);
-      setShowLogoutConfirm(false);
-      navigate('/admin_login');
-    }, 1500);
+      localStorage.removeItem('session_id');
+
+      setTimeout(() => {
+        setIsLoggingOut(false);
+        setShowLogoutConfirm(false);
+        navigate('/login');
+      }, 800);
+    }
   };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center h-16 px-4">
-        {/* Menu button */}
         <button
           onClick={() => setIsSidebarOpen(true)}
           className="lg:hidden text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100"
@@ -71,11 +85,10 @@ const Header = ({ setIsSidebarOpen }) => {
           <Menu className="h-6 w-6" />
         </button>
 
-        {/* Profile Menu */}
         <div className="flex items-center space-x-4 ml-auto">
           <div className="relative">
             <button
-              ref={buttonRef} // ref sa toggle button
+              ref={buttonRef}
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center space-x-3 text-green-700 hover:text-green-900 p-2 rounded-lg hover:bg-green-100"
             >
@@ -103,7 +116,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
             {showProfileMenu && (
               <div
-                ref={menuRef} // ref lang sa dropdown
+                ref={menuRef}
                 className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
               >
                 <div className="py-2">
@@ -136,7 +149,6 @@ const Header = ({ setIsSidebarOpen }) => {
         </div>
       </div>
 
-      {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-80 text-center shadow-2xl">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminHeader from '../AdminManagement/AdminHeader';
 import AdminTable from '../AdminManagement/AdminTable';
+import { useRole } from '../../contexts/RoleContext';
 import AddAdminModal from '../AdminManagement/AddAdminModal'; 
 import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -12,6 +13,7 @@ const AdminManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editAdmin, setEditAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = useRole();
   const [successDelete, setSuccessDelete] = useState(false);
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
