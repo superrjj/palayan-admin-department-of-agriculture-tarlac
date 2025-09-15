@@ -6,6 +6,7 @@ import { db } from "../firebase/config";
 import { User, Lock, Eye, EyeOff, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
 import { v4 as uuidv4 } from "uuid"; // for single-session
 import { useRole } from "../contexts/RoleContext"; 
+import bcrypt from 'bcryptjs'; // <<< ADD
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -62,26 +63,42 @@ export default function AdminLogin() {
 
     try {
       const users = await fetchUsers();
-      const user = users.find(
-        u => (u.username === formData.username || u.email === formData.username) &&
-            u.password === formData.password
+
+      // Find the candidate by username/email only
+      const candidate = users.find(
+        u => u.username === formData.username || u.email === formData.username
       );
 
-      if (user) {
+      let isValid = false;
+      if (candidate) {
+        const stored = candidate.password || '';
+        if (typeof stored === 'string' && stored.startsWith('$2')) {
+          // Hashed (bcrypt)
+          try {
+            isValid = await bcrypt.compare(formData.password, stored);
+          } catch {
+            isValid = false;
+          }
+        } else {
+          // Legacy plain-text
+          isValid = stored === formData.password;
+        }
+      }
+
+      if (candidate && isValid) {
         //Single-session
         const sessionId = uuidv4();
         try {
-          await updateDoc(doc(db, "accounts", user.id), { 
+          await updateDoc(doc(db, "accounts", candidate.id), { 
             lastLogin: new Date(), 
             status: "active",
             currentSession: sessionId //new field
           });
         } catch (err) { console.error("Failed to update lastLogin:", err); }
 
-        localStorage.setItem("admin_token", user.id);
+        localStorage.setItem("admin_token", candidate.id);
         localStorage.setItem("session_id", sessionId); // save current session locally
        
-
         //ensure role is loaded before navigating so the sidebar is correct immediately
         await reloadUserData();
 
@@ -149,7 +166,12 @@ export default function AdminLogin() {
       const users = await fetchUsers();
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
-      await updateDoc(doc(db, "accounts", user.id), { password: newPassword });
+
+      // Hash before save
+      const salt = await bcrypt.genSalt(10);
+      const hashed = await bcrypt.hash(newPassword, salt);
+
+      await updateDoc(doc(db, "accounts", user.id), { password: hashed });
       alert('Password reset successfully!');
       setShowForgotPassword(false);
       setFpStep(1);

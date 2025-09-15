@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import bcrypt from 'bcryptjs';
 import { X, CheckCircle, XCircle, Lock, Mail, User, Shield, HelpCircle } from "lucide-react";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config"; // adjust path if needed
 
 const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   const [formData, setFormData] = useState({
@@ -13,9 +16,46 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   });
 
   const [success, setSuccess] = useState(false);
-
-
   const isEdit = !!adminData;
+
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, ok: false, msg: "" });
+
+  useEffect(() => {
+    let cancelled = false;
+    const value = (formData.username || "").trim();
+
+    if (!value) {
+      setUsernameStatus({ checking: false, ok: false, msg: "" });
+      return;
+    }
+    if (value.length < 8) {
+      setUsernameStatus({ checking: false, ok: false, msg: "Username must be at least 8 characters" });
+      return;
+    }
+
+    setUsernameStatus({ checking: true, ok: false, msg: "" });
+    const t = setTimeout(async () => {
+      try {
+        const q = query(collection(db, "accounts"), where("username", "==", value));
+        const snap = await getDocs(q);
+        const conflict = snap.docs.find(d => d.id !== (adminData?.id || ""));
+        if (!cancelled) {
+          if (conflict) {
+            setUsernameStatus({ checking: false, ok: false, msg: "Username is already taken" });
+          } else {
+            setUsernameStatus({ checking: false, ok: true, msg: "Username is available" });
+          }
+        }
+      } catch {
+        if (!cancelled) setUsernameStatus({ checking: false, ok: false, msg: "Could not verify username" });
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [formData.username, adminData?.id]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -28,16 +68,35 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     special: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password),
   };
 
- const handleSubmit = (e) => {
-  e.preventDefault();
-  onSave(formData, adminData?.id);
-  setSuccess(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!usernameStatus.ok || usernameStatus.checking) return;
 
-  setTimeout(() => {
-    setSuccess(false); 
-   
-  }, 3000); 
-};
+    let passwordToSave = formData.password;
+    try {
+      const looksHashed = typeof passwordToSave === 'string' && passwordToSave.startsWith('$2a$');
+      const isSameAsOriginal = !!adminData && passwordToSave === adminData?.password;
+      if (!looksHashed && !isSameAsOriginal) {
+        const salt = await bcrypt.genSalt(10);
+        passwordToSave = await bcrypt.hash(formData.password, salt);
+      }
+    } catch (err) {
+      console.error('Password hashing failed:', err);
+    }
+
+    onSave(
+      {
+        ...formData,
+        username: formData.username.trim(),
+        normalizedUsername: formData.username.trim().toLowerCase(),
+        password: passwordToSave
+      },
+      adminData?.id
+    );
+
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+  };
 
   const securityQuestions = [
     "What is your mother's maiden name?",
@@ -60,7 +119,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Full Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
@@ -77,7 +135,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
@@ -94,7 +151,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
             </div>
           </div>
 
-          {/* Username */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
@@ -109,9 +165,16 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
                 required
               />
             </div>
+            <div className="mt-1 text-xs">
+              {usernameStatus.checking && <span className="text-gray-500">Checking...</span>}
+              {!usernameStatus.checking && usernameStatus.msg && (
+                <span className={usernameStatus.ok ? 'text-green-600' : 'text-red-600'}>
+                  {usernameStatus.msg}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
@@ -141,7 +204,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
             </div>
           </div>
 
-          {/* Security Question */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Security Question</label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
@@ -153,7 +215,7 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
                 className="w-full p-2 outline-none bg-transparent"
               >
                 <option value="">-- Select a question --</option>
-                {securityQuestions.map((q, i) => (
+                {["What is your mother's maiden name?","What is the name of your first pet?","What is your favorite teacher’s name?","What city were you born in?","What was your first school?"].map((q, i) => (
                   <option key={i} value={q}>{q}</option>
                 ))}
               </select>
@@ -175,7 +237,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
             </div>
           )}
 
-          {/* Role */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <select
@@ -183,22 +244,26 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
               value={formData.role}
               onChange={handleChange}
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-              disabled={isEdit} // cannot edit role
+              disabled={isEdit}
             >
               <option value="SYSTEM_ADMIN">System Admin</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>
 
-          {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md">{isEdit ? "Update" : "Save"}</button>
+            <button
+              type="submit"
+              disabled={!usernameStatus.ok || usernameStatus.checking}
+              className={`px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md ${(!usernameStatus.ok || usernameStatus.checking) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isEdit ? "Update" : "Save"}
+            </button>
           </div>
         </form>
       </div>
 
-      {/* Success Animation */}
       {success && (
         <div className="absolute inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
