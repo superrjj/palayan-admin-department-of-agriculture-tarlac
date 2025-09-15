@@ -8,6 +8,7 @@ import {
   orderBy,
   limit as fbLimit
 } from 'firebase/firestore';
+import { useRole } from '../../contexts/RoleContext';
 import { db } from '../../firebase/config';
 
 const Dashboard = () => {
@@ -16,9 +17,9 @@ const Dashboard = () => {
   const [totalVarieties, setTotalVarieties] = useState(0);
   const [totalPests, setTotalPests] = useState(0);
   const [recentActivities, setRecentActivities] = useState([]);
+  const { userInfo } = useRole();
 
   useEffect(() => {
-    // Admins: count active, not deleted, role in [SYSTEM_ADMIN, ADMIN]
     const adminsQ = query(
       collection(db, 'accounts'),
       where('isDeleted', '==', false),
@@ -29,27 +30,22 @@ const Dashboard = () => {
       setTotalAdmins(snap.size);
     });
 
-    // Diseases: exclude deleted/archived
     const diseasesQ = query(
       collection(db, 'rice_local_diseases'),
       where('isDeleted', '==', false)
-      // If you also have archived flag: where not supported directly; keep a boolean e.g. isArchived:false
     );
     const unsubDiseases = onSnapshot(diseasesQ, (snap) => {
       setTotalDiseases(snap.size);
     });
 
-    // Varieties: exclude deleted/archived
     const varietiesQ = query(
       collection(db, 'rice_seed_varieties'),
       where('isDeleted', '==', false)
-      // add where if you have that field
     );
     const unsubVarieties = onSnapshot(varietiesQ, (snap) => {
       setTotalVarieties(snap.size);
     });
 
-    // Pests: exclude deleted/archived
     const pestsQ = query(
       collection(db, 'rice_local_pests'),
       where('isDeleted', '==', false)
@@ -58,44 +54,57 @@ const Dashboard = () => {
       setTotalPests(snap.size);
     });
 
-    // Recent activities: take from audit_logs, real-time
-    const activitiesQ = query(
-      collection(db, 'audit_logs'),
-      orderBy('timestamp', 'desc'),
-      fbLimit(5)
-    );
-    const unsubActivities = onSnapshot(activitiesQ, (snap) => {
-      const items = snap.docs.map((d) => {
-        const data = d.data();
-        const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
-        // derive type icon by collection
-        const type =
-          data.collection === 'rice_local_pests'
-            ? 'pest'
-            : data.collection === 'rice_local_diseases'
-            ? 'disease'
-            : data.collection === 'rice_seed_varieties'
-            ? 'variety'
-            : 'admin';
-        const display = {
-          id: d.id,
-          type,
-          action: buildActivityLabel(data),
-          time: ts.toLocaleString()
-        };
-        return display;
-      });
-      setRecentActivities(items);
-    });
-
     return () => {
       unsubAdmins();
       unsubDiseases();
       unsubVarieties();
       unsubPests();
-      unsubActivities();
     };
   }, []);
+
+  useEffect(() => {
+    if (!userInfo?.id) {
+      setRecentActivities([]);
+      return;
+    }
+
+    const activitiesQ = query(
+      collection(db, 'audit_logs'),
+      where('userId', '==', userInfo.id),
+      orderBy('timestamp', 'desc'),
+      fbLimit(5)
+    );
+
+    const unsubActivities = onSnapshot(
+      activitiesQ,
+      (snap) => {
+        const items = snap.docs.map((d) => {
+          const data = d.data();
+          const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+          const type =
+            data.collection === 'rice_local_pests'
+              ? 'pest'
+              : data.collection === 'rice_local_diseases'
+              ? 'disease'
+              : data.collection === 'rice_seed_varieties'
+              ? 'variety'
+              : 'admin';
+          return {
+            id: d.id,
+            type,
+            action: buildActivityLabel(data),
+            time: ts.toLocaleString()
+          };
+        });
+        setRecentActivities(items);
+      },
+      (err) => {
+        console.error('Recent activities error:', err);
+      }
+    );
+
+    return () => unsubActivities();
+  }, [userInfo?.id]);
 
   const buildActivityLabel = (log) => {
     const docName = log.documentName || log.name || 'Unknown';
@@ -119,7 +128,7 @@ const Dashboard = () => {
       case 'rice_local_pests':
         return 'Pest';
       case 'rice_local_diseases':
-        return 'Sisease';
+        return 'Disease';
       case 'rice_seed_varieties':
         return 'Rice variety';
       default:
