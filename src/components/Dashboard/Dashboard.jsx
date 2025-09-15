@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wheat, Bug, Shield, Users, Activity } from 'lucide-react';
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase/config";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  limit as fbLimit
+} from 'firebase/firestore';
+import { db } from '../../firebase/config';
 
 const Dashboard = () => {
   const [totalAdmins, setTotalAdmins] = useState(0);
@@ -9,118 +16,76 @@ const Dashboard = () => {
   const [totalVarieties, setTotalVarieties] = useState(0);
   const [totalPests, setTotalPests] = useState(0);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Helper to add activity to state
-  const addActivity = (type, action, item, timestamp) => {
-    setRecentActivities(prev => [
-      {
-        id: Date.now() + Math.random(),
-        type,
-        action,
-        item,
-        time: timestamp?.toDate ? timestamp.toDate().toLocaleString() : new Date().toLocaleString()
-      },
-      ...prev.slice(0, 9)
-    ]);
-  };
 
   useEffect(() => {
-    let listenersInitialized = 0;
-    const totalListeners = 4;
-
-    const checkAllLoaded = () => {
-      listenersInitialized++;
-      if (listenersInitialized >= totalListeners) {
-        setTimeout(() => setIsInitialLoad(false), 1000);
-      }
-    };
-
-    // 🔹 Admins
-    const unsubAdmins = onSnapshot(collection(db, "accounts"), snapshot => {
-      const adminsCount = snapshot.docs.filter(
-        doc => doc.data().role === "admin" || doc.data().role === "super admin"
-      ).length;
-      setTotalAdmins(adminsCount);
-
-      if (!isInitialLoad) {
-        snapshot.docChanges().forEach(change => {
-          const data = change.doc.data();
-          const itemName = data.fullname || "Unknown Admin";
-          
-          if (change.type === "added") {
-            addActivity("admin", `New admin registered: ${itemName}`, itemName, data.createdAt);
-          } else if (change.type === "removed") {
-            addActivity("admin", `Admin removed: ${itemName}`, itemName, new Date());
-          } else if (change.type === "modified") {
-            addActivity("admin", `Admin profile updated: ${itemName}`, itemName, data.updatedAt);
-          }
-        });
-      }
-      checkAllLoaded();
+    // Admins: count active, not deleted, role in [SYSTEM_ADMIN, ADMIN]
+    const adminsQ = query(
+      collection(db, 'accounts'),
+      where('isDeleted', '==', false),
+      where('status', '==', 'active'),
+      where('role', 'in', ['SYSTEM_ADMIN', 'ADMIN'])
+    );
+    const unsubAdmins = onSnapshot(adminsQ, (snap) => {
+      setTotalAdmins(snap.size);
     });
 
-    // 🔹 Diseases
-    const unsubDiseases = onSnapshot(collection(db, "rice_local_diseases"), snapshot => {
-      setTotalDiseases(snapshot.size);
-      
-      if (!isInitialLoad) {
-        snapshot.docChanges().forEach(change => {
-          const data = change.doc.data();
-          const itemName = data.name || "Unknown Disease";
-          
-          if (change.type === "added") {
-            addActivity("disease", `New disease added: ${itemName}`, itemName, data.createdAt);
-          } else if (change.type === "removed") {
-            addActivity("disease", `Disease deleted: ${itemName}`, itemName, new Date());
-          } else if (change.type === "modified") {
-            addActivity("disease", `Disease updated: ${itemName}`, itemName, data.updatedAt);
-          }
-        });
-      }
-      checkAllLoaded();
+    // Diseases: exclude deleted/archived
+    const diseasesQ = query(
+      collection(db, 'rice_local_diseases'),
+      where('isDeleted', '==', false)
+      // If you also have archived flag: where not supported directly; keep a boolean e.g. isArchived:false
+    );
+    const unsubDiseases = onSnapshot(diseasesQ, (snap) => {
+      setTotalDiseases(snap.size);
     });
 
-    // 🔹 Varieties
-    const unsubVarieties = onSnapshot(collection(db, "rice_seed_varieties"), snapshot => {
-      setTotalVarieties(snapshot.size);
-      
-      if (!isInitialLoad) {
-        snapshot.docChanges().forEach(change => {
-          const data = change.doc.data();
-          const itemName = data.name || data.varietyName || "Unknown Variety";
-          
-          if (change.type === "added") {
-            addActivity("variety", `New rice variety added: ${itemName}`, itemName, data.createdAt);
-          } else if (change.type === "removed") {
-            addActivity("variety", `Rice variety deleted: ${itemName}`, itemName, new Date());
-          } else if (change.type === "modified") {
-            addActivity("variety", `Rice variety updated: ${itemName}`, itemName, data.updatedAt);
-          }
-        });
-      }
-      checkAllLoaded();
+    // Varieties: exclude deleted/archived
+    const varietiesQ = query(
+      collection(db, 'rice_seed_varieties'),
+      where('isDeleted', '==', false)
+      // add where if you have that field
+    );
+    const unsubVarieties = onSnapshot(varietiesQ, (snap) => {
+      setTotalVarieties(snap.size);
     });
 
-    // 🔹 Pests
-    const unsubPests = onSnapshot(collection(db, "rice_local_pests"), snapshot => {
-      setTotalPests(snapshot.size);
-      
-      if (!isInitialLoad) {
-        snapshot.docChanges().forEach(change => {
-          const data = change.doc.data();
-          const itemName = data.name || "Unknown Pest";
-          
-          if (change.type === "added") {
-            addActivity("pest", `New pest added: ${itemName}`, itemName, data.createdAt);
-          } else if (change.type === "removed") {
-            addActivity("pest", `Pest deleted: ${itemName}`, itemName, new Date());
-          } else if (change.type === "modified") {
-            addActivity("pest", `Pest updated: ${itemName}`, itemName, data.updatedAt);
-          }
-        });
-      }
-      checkAllLoaded();
+    // Pests: exclude deleted/archived
+    const pestsQ = query(
+      collection(db, 'rice_local_pests'),
+      where('isDeleted', '==', false)
+    );
+    const unsubPests = onSnapshot(pestsQ, (snap) => {
+      setTotalPests(snap.size);
+    });
+
+    // Recent activities: take from audit_logs, real-time
+    const activitiesQ = query(
+      collection(db, 'audit_logs'),
+      orderBy('timestamp', 'desc'),
+      fbLimit(5)
+    );
+    const unsubActivities = onSnapshot(activitiesQ, (snap) => {
+      const items = snap.docs.map((d) => {
+        const data = d.data();
+        const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+        // derive type icon by collection
+        const type =
+          data.collection === 'rice_local_pests'
+            ? 'pest'
+            : data.collection === 'rice_local_diseases'
+            ? 'disease'
+            : data.collection === 'rice_seed_varieties'
+            ? 'variety'
+            : 'admin';
+        const display = {
+          id: d.id,
+          type,
+          action: buildActivityLabel(data),
+          time: ts.toLocaleString()
+        };
+        return display;
+      });
+      setRecentActivities(items);
     });
 
     return () => {
@@ -128,14 +93,44 @@ const Dashboard = () => {
       unsubDiseases();
       unsubVarieties();
       unsubPests();
+      unsubActivities();
     };
-  }, [isInitialLoad]);
+  }, []);
+
+  const buildActivityLabel = (log) => {
+    const docName = log.documentName || log.name || 'Unknown';
+    const action = (log.action || '').toUpperCase();
+    if (action === 'CREATE' || action === 'ADD' || action === 'ADDED' || action === 'INSERT') {
+      return `New ${friendlyCollection(log.collection)} added: ${docName}`;
+    }
+    if (action === 'UPDATE' || action === 'UPDATED' || action === 'EDIT' || action === 'EDITED') {
+      return `${friendlyCollection(log.collection)} updated: ${docName}`;
+    }
+    if (action === 'DELETE' || action === 'DELETED' || action === 'REMOVE' || action === 'REMOVED') {
+      return `${friendlyCollection(log.collection)} deleted: ${docName}`;
+    }
+    return `${friendlyCollection(log.collection)} activity: ${docName}`;
+  };
+
+  const friendlyCollection = (col) => {
+    switch (col) {
+      case 'accounts':
+        return 'Account';
+      case 'rice_local_pests':
+        return 'Pest';
+      case 'rice_local_diseases':
+        return 'Sisease';
+      case 'rice_seed_varieties':
+        return 'Rice variety';
+      default:
+        return 'item';
+    }
+  };
 
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Overview</h1>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
           <div className="flex items-center">
@@ -178,7 +173,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Activities */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
           <Activity className="h-5 w-5 mr-2" />
@@ -188,18 +182,28 @@ const Dashboard = () => {
           {recentActivities.length === 0 ? (
             <p className="text-gray-500 text-sm">No recent activities yet.</p>
           ) : (
-            recentActivities.map(activity => (
+            recentActivities.map((activity) => (
               <div key={activity.id} className="flex items-center p-3 bg-gray-50 rounded-lg">
-                <div className={`p-2 rounded-full mr-4 ${
-                  activity.type === 'pest' ? 'bg-red-100 text-red-600' :
-                  activity.type === 'disease' ? 'bg-orange-100 text-orange-600' :
-                  activity.type === 'variety' ? 'bg-green-100 text-green-600' :
-                  'bg-blue-100 text-blue-600'
-                }`}>
-                  {activity.type === 'pest' ? <Bug className="h-4 w-4" /> :
-                   activity.type === 'disease' ? <Shield className="h-4 w-4" /> :
-                   activity.type === 'variety' ? <Wheat className="h-4 w-4" /> :
-                   <Users className="h-4 w-4" />}
+                <div
+                  className={`p-2 rounded-full mr-4 ${
+                    activity.type === 'pest'
+                      ? 'bg-red-100 text-red-600'
+                      : activity.type === 'disease'
+                      ? 'bg-orange-100 text-orange-600'
+                      : activity.type === 'variety'
+                      ? 'bg-green-100 text-green-600'
+                      : 'bg-blue-100 text-blue-600'
+                  }`}
+                >
+                  {activity.type === 'pest' ? (
+                    <Bug className="h-4 w-4" />
+                  ) : activity.type === 'disease' ? (
+                    <Shield className="h-4 w-4" />
+                  ) : activity.type === 'variety' ? (
+                    <Wheat className="h-4 w-4" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{activity.action}</p>
