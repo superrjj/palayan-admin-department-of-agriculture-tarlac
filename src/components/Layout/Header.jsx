@@ -1,15 +1,18 @@
 // components/Header.jsx
-import React, { useEffect, useRef, useState } from 'react';
-import { Menu, Settings, LogOut, User, ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Menu, Settings, LogOut, User, ChevronDown, Camera, Mail, Key, Phone, X, Loader2, ZoomIn, ZoomOut, Crop as CropIcon } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth, updateEmail, sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import Cropper from 'react-easy-crop';
 
 const Header = ({ setIsSidebarOpen }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userData, setUserData] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const navigate = useNavigate();
 
   const menuRef = useRef(null);
@@ -21,7 +24,7 @@ const Header = ({ setIsSidebarOpen }) => {
       if (userId) {
         const userDoc = await getDoc(doc(db, 'accounts', userId));
         if (userDoc.exists()) {
-          setUserData(userDoc.data());
+          setUserData({ id: userId, ...userDoc.data() });
         }
       }
     };
@@ -45,7 +48,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
   const getInitials = (fullname) => {
     if (!fullname) return '';
-    const names = fullname.split(' ');
+    const names = fullname.split(' ').filter(Boolean);
     const initials = names.map((n) => n[0].toUpperCase());
     return initials[0] + (initials.length > 1 ? initials[initials.length - 1] : '');
   };
@@ -55,7 +58,6 @@ const Header = ({ setIsSidebarOpen }) => {
     try {
       const userId = localStorage.getItem('admin_token');
       if (userId) {
-        // Do not set status to 'inactive' on logout
         await updateDoc(doc(db, 'accounts', userId), {
           currentSession: null,
           lastLogoutAt: serverTimestamp()
@@ -92,10 +94,14 @@ const Header = ({ setIsSidebarOpen }) => {
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center space-x-3 text-green-700 hover:text-green-900 p-2 rounded-lg hover:bg-green-100"
             >
-              <div className="w-8 h-8 bg-green-700 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
-                  {getInitials(userData?.fullname || 'User')}
-                </span>
+              <div className="w-10 h-10 bg-green-700 rounded-full overflow-hidden flex items-center justify-center">
+                {userData?.photoURL ? (
+                  <img src={userData.photoURL} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-medium">
+                    {getInitials(userData?.fullname || 'User')}
+                  </span>
+                )}
               </div>
               <div className="hidden sm:block text-left">
                 {userData ? (
@@ -108,9 +114,7 @@ const Header = ({ setIsSidebarOpen }) => {
                 )}
               </div>
               <ChevronDown
-                className={`h-4 w-4 transition-transform duration-200 ${
-                  showProfileMenu ? 'rotate-180' : 'rotate-0'
-                }`}
+                className={`h-4 w-4 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : 'rotate-0'}`}
               />
             </button>
 
@@ -121,11 +125,14 @@ const Header = ({ setIsSidebarOpen }) => {
               >
                 <div className="py-2">
                   <button
-                    onClick={() => setShowProfileMenu(false)}
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      setShowAccountModal(true);
+                    }}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
                   >
                     <User className="h-4 w-4 mr-3" />
-                    Profile Settings
+                    Account Settings
                   </button>
                   <button
                     onClick={() => setShowProfileMenu(false)}
@@ -180,7 +187,375 @@ const Header = ({ setIsSidebarOpen }) => {
           </div>
         </div>
       )}
+
+      {showAccountModal && userData && (
+        <AccountSettingsModal
+          initialData={userData}
+          onClose={() => setShowAccountModal(false)}
+          onSaved={(next) => setUserData((prev) => ({ ...prev, ...next }))}
+        />
+      )}
     </header>
+  );
+};
+
+const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
+  const [fullname, setFullname] = useState(initialData.fullname || '');
+  const [email, setEmail] = useState(initialData.email || '');
+  const [contact, setContact] = useState(initialData.contactNo || '');
+  const [photoPreview, setPhotoPreview] = useState(initialData.photoURL || '');
+  const [photoFile, setPhotoFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
+  const [error, setError] = useState('');
+  const overlayRef = useRef(null);
+
+  // Cropper state
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropSrc, setCropSrc] = useState(''); // raw selected image (data URL)
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  useEffect(() => {
+    const onEsc = (e) => e.key === 'Escape' && (showCropper ? setShowCropper(false) : onClose());
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [onClose, showCropper]);
+
+  const onOverlayClick = (e) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  const readFileAsDataURL = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const onPickPhoto = async (e) => {
+    setError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataURL(file);
+      setPhotoFile(file);
+      setCropSrc(dataUrl);
+      setShowCropper(true);
+      setZoom(1);
+      setCrop({ x: 0, y: 0 });
+    } catch {
+      setError('Failed to read selected file.');
+    }
+  };
+
+  const onCropComplete = useCallback((_, croppedPixels) => {
+    setCroppedAreaPixels(croppedPixels);
+  }, []);
+
+  const createImage = (url) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+
+  const getCroppedDataUrl = async (imageSrc, cropPixels) => {
+    const img = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    canvas.width = cropPixels.width;
+    canvas.height = cropPixels.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(
+      img,
+      cropPixels.x,
+      cropPixels.y,
+      cropPixels.width,
+      cropPixels.height,
+      0,
+      0,
+      cropPixels.width,
+      cropPixels.height
+    );
+    return canvas.toDataURL('image/png');
+  };
+
+  const confirmCrop = async () => {
+    try {
+      if (!cropSrc || !croppedAreaPixels) return;
+      const croppedDataUrl = await getCroppedDataUrl(cropSrc, croppedAreaPixels);
+      setPhotoPreview(croppedDataUrl);
+      setShowCropper(false);
+    } catch (e) {
+      console.error(e);
+      setError('Failed to crop image.');
+    }
+  };
+
+  const handleSave = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      const userId = localStorage.getItem('admin_token');
+      if (!userId) throw new Error('No user id');
+
+      if (email && email !== initialData.email) {
+        try {
+          const auth = getAuth();
+          if (auth.currentUser) {
+            await updateEmail(auth.currentUser, email);
+          }
+        } catch (e) {
+          console.warn('updateEmail failed, will still update Firestore:', e);
+        }
+      }
+
+      const nextFields = {
+        fullname: fullname.trim(),
+        email: email.trim(),
+        contactNo: contact.trim(),
+      };
+
+      // Save cropped preview (data URL) as photoURL for now
+      if (photoPreview && (photoFile || !initialData.photoURL || photoPreview !== initialData.photoURL)) {
+        nextFields.photoURL = photoPreview;
+      }
+
+      await updateDoc(doc(db, 'accounts', userId), nextFields);
+      onSaved(nextFields);
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setError(e.message || 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendPasswordReset = async () => {
+    setError('');
+    setSendingReset(true);
+    try {
+      const auth = getAuth();
+      const target = email || auth.currentUser?.email;
+      if (!target) throw new Error('No email available.');
+      await sendPasswordResetEmail(auth, target);
+    } catch (e) {
+      console.error(e);
+      setError(e.message || 'Failed to send reset email.');
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
+  return (
+    <>
+      <div
+        ref={overlayRef}
+        onMouseDown={onOverlayClick}
+        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold text-gray-800">Account Settings</h3>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100">
+              <X className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
+
+          <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+            <section className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Personal Info</h4>
+
+              {/* Centered, larger avatar */}
+              <div className="flex flex-col items-center justify-center gap-4 mb-5">
+                <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ring-2 ring-gray-200">
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="h-10 w-10 text-gray-400" />
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer hover:bg-gray-50">
+                    <Camera className="h-4 w-4" />
+                    <span>Upload Profile Picture</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
+                  </label>
+                  {photoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (photoPreview) {
+                          setCropSrc(photoPreview);
+                          setShowCropper(true);
+                          setZoom(1);
+                          setCrop({ x: 0, y: 0 });
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
+                    >
+                      <CropIcon className="h-4 w-4" />
+                      Re-crop
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Full name</label>
+                  <input
+                    type="text"
+                    value={fullname}
+                    onChange={(e) => setFullname(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-lg border pl-9 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Contact number</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      className="w-full rounded-lg border pl-9 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                      placeholder="09XXXXXXXXX"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Change Password / Update Email</h4>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleSendPasswordReset}
+                  disabled={sendingReset}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {sendingReset ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                  {sendingReset ? 'Sending...' : 'Send password reset email'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                To change password, we will send a reset link to your email.
+              </p>
+            </section>
+
+            {error && (
+              <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 disabled:opacity-70 inline-flex items-center gap-2"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? 'Saving...' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Cropper dialog (centered, does not override, scroll-safe) */}
+      {showCropper && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-800">Crop Profile Picture</h3>
+              <button onClick={() => setShowCropper(false)} className="p-2 rounded-lg hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="relative w-full h-[50vh] bg-gray-100 rounded-xl overflow-hidden">
+                <Cropper
+                  image={cropSrc}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  showGrid={false}
+                  cropShape="round"
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={onCropComplete}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 mt-4">
+                <ZoomOut className="h-4 w-4 text-gray-500" />
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <ZoomIn className="h-4 w-4 text-gray-500" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+              <button
+                onClick={() => setShowCropper(false)}
+                className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCrop}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 inline-flex items-center gap-2"
+              >
+                <CropIcon className="h-4 w-4" />
+                Apply crop
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
