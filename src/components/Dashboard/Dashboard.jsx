@@ -16,7 +16,14 @@ const Dashboard = () => {
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalVarieties, setTotalVarieties] = useState(0);
   const [totalPests, setTotalPests] = useState(0);
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [recentActivities, setRecentActivities] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const { userInfo } = useRole();
 
   useEffect(() => {
@@ -64,9 +71,11 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!userInfo?.id) {
-      setRecentActivities([]);
+      setActivitiesLoading(true);
       return;
     }
+
+    setActivitiesLoading(true);
 
     const activitiesQ = query(
       collection(db, 'audit_logs'),
@@ -97,9 +106,14 @@ const Dashboard = () => {
           };
         });
         setRecentActivities(items);
+        try {
+          localStorage.setItem('recentActivities', JSON.stringify(items));
+        } catch {}
+        setActivitiesLoading(false);
       },
       (err) => {
         console.error('Recent activities error:', err);
+        setActivitiesLoading(false);
       }
     );
 
@@ -188,7 +202,12 @@ const Dashboard = () => {
           Recent Activities
         </h2>
         <div className="space-y-4">
-          {recentActivities.length === 0 ? (
+          {activitiesLoading && recentActivities.length === 0 ? (
+            <div className="space-y-2">
+              <div className="h-12 bg-gray-100 animate-pulse rounded" />
+              <div className="h-12 bg-gray-100 animate-pulse rounded" />
+            </div>
+          ) : recentActivities.length === 0 ? (
             <p className="text-gray-500 text-sm">No recent activities yet.</p>
           ) : (
             recentActivities.map((activity) => (

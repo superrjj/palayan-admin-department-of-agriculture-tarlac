@@ -15,8 +15,51 @@ const History = () => {
   const [expandedLog, setExpandedLog] = useState(null);
   const { userInfo, isSystemAdmin } = useRole();
   const [isLoading, setIsLoading] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
 
-  // FIXED: Complete fetchLogs function with proper query execution
+  // Auto-refresh relative times (every 30s; change to 1000 for every second)
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Helpers for timestamps
+  const toDateSafe = (timestamp) => {
+    if (!timestamp) return null;
+    try {
+      return timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    } catch {
+      return null;
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    const date = toDateSafe(timestamp);
+    if (!date || isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const formatShortRelative = (timestamp, now = Date.now()) => {
+    const date = toDateSafe(timestamp);
+    if (!date || isNaN(date.getTime())) return 'Invalid';
+    const diff = Math.max(0, Math.floor((now - date.getTime()) / 1000)); // seconds
+    if (diff < 60) return `${diff || 1}s`;
+    const m = Math.floor(diff / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    const d = Math.floor(h / 24);
+    return `${d}d`;
+  };
+
+  //Complete fetchLogs function with proper query execution
   useEffect(() => {
     const fetchLogs = () => {
       let q;
@@ -161,25 +204,6 @@ const History = () => {
     }
   };
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'Invalid Date';
-    
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleString('en-PH', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    } catch (error) {
-      console.error('Error formatting timestamp:', error);
-      return 'Invalid Date';
-    }
-  };
-
   const exportLogs = () => {
     const csvContent = [
       ['Timestamp', 'User', 'Action', 'Collection', 'Document', 'Description'],
@@ -254,10 +278,12 @@ const History = () => {
                   </div>
                 </div>
 
-                {/* Timestamp */}
+                {/* Timestamp (short relative + full on hover) */}
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Clock className="w-4 h-4" />
-                  <span>{formatTimestamp(log.timestamp)}</span>
+                  <span title={formatTimestamp(log.timestamp)}>
+                    {formatShortRelative(log.timestamp, nowTick)}
+                  </span>
                 </div>
               </div>
             </div>
