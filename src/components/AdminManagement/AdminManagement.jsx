@@ -194,20 +194,34 @@ const AdminManagement = () => {
   };
 
   const handleEdit = (admin) => {
+    console.log("Editing admin:", admin);
     setEditAdmin(admin);
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
+    if (id === currentUser.id) {
+      alert('You cannot delete your own account.');
+      return;
+    }
     try {
+      console.log("Deleting admin with ID:", id);
       setSuccessDelete(true);
+
       const adminToDelete = admins.find(a => a.id === id);
+      console.log("Admin to delete:", adminToDelete);
+
       setTimeout(async () => {
+        console.log("Current user when deleting:", currentUser);
+        
         await updateDoc(doc(db, "accounts", id), {
           isDeleted: true,
           deletedAt: new Date(),
           deletedBy: currentUser.id
         });
+        
+        console.log("Admin soft deleted successfully");
+        
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -223,6 +237,7 @@ const AdminManagement = () => {
             after: null
           }
         });
+
         setAdmins((prev) => prev.filter((a) => a.id !== id));
         setSuccessDelete(false);
       }, 1000);
@@ -233,6 +248,10 @@ const AdminManagement = () => {
   };
 
   const handleToggleRestriction = async (id, nextActive, targetRow) => {
+    if (id === currentUser.id) {
+      alert('You cannot restrict/unrestrict your own account.');
+      return;
+    }
     try {
       const prev = admins.find(a => a.id === id) || targetRow;
       const updateData = {
@@ -280,6 +299,7 @@ const AdminManagement = () => {
         startIndex={startIndex}
         itemsPerPage={itemsPerPage}
         filteredAdmins={filteredAdmins}
+        currentUserId={currentUser.id} // ADDED
       />
 
       {isModalOpen && (

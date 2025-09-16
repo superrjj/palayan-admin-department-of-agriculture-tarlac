@@ -10,7 +10,8 @@ const AdminTable = ({
   onToggleRestriction, // (id, nextActiveBool, row) => void
   currentPage, 
   totalPages, 
-  setCurrentPage 
+  setCurrentPage,
+  currentUserId // ADDED
 }) => {
 
   const getRoleIcon = (role) => role === 'super admin'
@@ -66,6 +67,8 @@ const AdminTable = ({
             ) : (
               admins.map((admin) => {
                 const isActive = (admin.status?.toLowerCase?.() === 'active') || admin.status === true;
+                const isSelf = admin.id === currentUserId;
+
                 return (
                   <tr key={admin.id} className="hover:bg-gray-50 transition-all">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{admin.fullname}</td>
@@ -98,18 +101,20 @@ const AdminTable = ({
                     <td className="px-6 py-4">
                       <div className="flex justify-center space-x-2">
                         <button
-                          onClick={() => onToggleRestriction?.(admin.id, !isActive, admin)}
-                          className={`p-2 rounded-lg transition ${isActive ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'}`}
+                          onClick={() => !isSelf && onToggleRestriction?.(admin.id, !isActive, admin)}
+                          className={`p-2 rounded-lg transition ${isActive ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'} ${isSelf ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                           aria-label={isActive ? 'Restrict' : 'Unrestrict'}
-                          title={isActive ? 'Restrict' : 'Unrestrict'}
+                          title={isSelf ? 'You cannot restrict your own account' : (isActive ? 'Restrict' : 'Unrestrict')}
+                          disabled={isSelf}
                         >
                           {isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                         </button>
                         <button
-                          onClick={() => onDelete(admin.id)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
+                          onClick={() => !isSelf && onDelete(admin.id)}
+                          className={`p-2 text-red-600 hover:bg-red-100 rounded-lg transition ${isSelf ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                           aria-label="Delete"
-                          title="Delete"
+                          title={isSelf ? 'You cannot delete your own account' : 'Delete'}
+                          disabled={isSelf}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
