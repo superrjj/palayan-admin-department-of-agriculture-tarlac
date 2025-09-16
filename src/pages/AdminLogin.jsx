@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUsers } from "../service/userService";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../firebase/config"; 
+import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { db } from "../firebase/config";
 import { User, Lock, Eye, EyeOff, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
-import { v4 as uuidv4 } from "uuid"; // for single-session
-import { useRole } from "../contexts/RoleContext"; 
-import bcrypt from 'bcryptjs'; // <<< ADD
+import { v4 as uuidv4 } from "uuid";
+import { useRole } from "../contexts/RoleContext";
+import bcrypt from 'bcryptjs';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { reloadUserData } = useRole(); //for refresh the role
+  const { reloadUserData } = useRole();
 
   const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
   const [showPassword, setShowPassword] = useState(false);
@@ -18,7 +18,11 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  //Forgot password states
+  // Restricted dialog
+  const [showRestricted, setShowRestricted] = useState(false);
+  const [restrictedMsg, setRestrictedMsg] = useState('Your account is currently restricted.');
+
+  // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [fpStep, setFpStep] = useState(1);
   const [fpUsername, setFpUsername] = useState('');
@@ -29,24 +33,23 @@ export default function AdminLogin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fpError, setFpError] = useState('');
 
-  //Live validation
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (fpStep === 1 && fpUsername.trim() !== '') setFpError('');
     if (fpStep === 2 && answer.trim() !== '') setFpError('');
     if (fpStep === 3 && newPassword !== '' && confirmPassword !== '') setFpError('');
   }, [fpUsername, answer, newPassword, confirmPassword, fpStep]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const validateForm = () => {
-    const newErrors = {};
-    if (!formData.username.trim()) newErrors.username = 'Please enter your username or email';
-    if (!formData.password.trim()) newErrors.password = 'Please enter your password';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const next = {};
+    if (!formData.username.trim()) next.username = 'Please enter your username or email';
+    if (!formData.password.trim()) next.password = 'Please enter your password';
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleInputChange = (e) => {
@@ -64,7 +67,7 @@ export default function AdminLogin() {
     try {
       const users = await fetchUsers();
 
-      // Find the candidate by username/email only
+      // Find candidate by username or email
       const candidate = users.find(
         u => u.username === formData.username || u.email === formData.username
       );
@@ -73,33 +76,64 @@ export default function AdminLogin() {
       if (candidate) {
         const stored = candidate.password || '';
         if (typeof stored === 'string' && stored.startsWith('$2')) {
-          // Hashed (bcrypt)
           try {
             isValid = await bcrypt.compare(formData.password, stored);
           } catch {
             isValid = false;
           }
         } else {
-          // Legacy plain-text
           isValid = stored === formData.password;
         }
       }
 
       if (candidate && isValid) {
-        //Single-session
+        // Block restricted/inactive/deleted accounts
+        const status = String(candidate.status || '').toLowerCase();
+        const isRestricted = candidate.isRestricted === true;
+        const isDeleted = candidate.isDeleted === true;
+
+        if (isDeleted || isRestricted || (status && status !== 'active')) {
+          const msg = isDeleted
+            ? 'This account has been deleted.'
+            : isRestricted || status === 'inactive'
+            ? 'Your account is restricted. Please contact an administrator.'
+            : 'Your account is not active.';
+          setRestrictedMsg(msg);
+          setShowRestricted(true);
+          setIsLoading(false);
+
+          // optional audit
+          try {
+            await addDoc(collection(db, "audit_logs"), {
+              userId: candidate.id,
+              userName: candidate.fullname || candidate.username || 'Unknown',
+              userEmail: candidate.email || '',
+              timestamp: new Date(),
+              action: 'LOGIN_BLOCKED',
+              collection: 'accounts',
+              documentId: candidate.id,
+              documentName: candidate.fullname || candidate.username || 'Unknown',
+              description: 'Login blocked due to restricted/inactive/deleted status',
+              details: { status: candidate.status || null, isRestricted, isDeleted }
+            });
+          } catch {}
+
+          return;
+        }
+
+        // Single-session set
         const sessionId = uuidv4();
         try {
           await updateDoc(doc(db, "accounts", candidate.id), { 
             lastLogin: new Date(), 
             status: "active",
-            currentSession: sessionId //new field
+            currentSession: sessionId
           });
         } catch (err) { console.error("Failed to update lastLogin:", err); }
 
         localStorage.setItem("admin_token", candidate.id);
-        localStorage.setItem("session_id", sessionId); // save current session locally
-       
-        //ensure role is loaded before navigating so the sidebar is correct immediately
+        localStorage.setItem("session_id", sessionId);
+
         await reloadUserData();
 
         setTimeout(() => {
@@ -119,7 +153,7 @@ export default function AdminLogin() {
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') handleLogin(); };
 
-  // -------------------- Forgot Password Handlers --------------------
+  // Forgot Password Handlers
   const handleFpNextUsername = async () => {
     if (!fpUsername.trim()) return setFpError("Please enter username or email");
     setFpError('');
@@ -141,7 +175,7 @@ export default function AdminLogin() {
       const users = await fetchUsers();
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
-      if (user.securityAnswer.toLowerCase() !== answer.toLowerCase()) return setFpError('Wrong answer');
+      if ((user.securityAnswer || '').toLowerCase() !== answer.toLowerCase()) return setFpError('Wrong answer');
       setFpStep(3);
     } catch {
       setFpError('Something went wrong');
@@ -151,23 +185,21 @@ export default function AdminLogin() {
   const handleFpResetPassword = async () => {
     if (!newPassword || !confirmPassword) return setFpError("Please fill both fields");
 
-    const passwordChecks = {
+    const checks = {
       length: newPassword.length >= 8,
       uppercase: /[A-Z]/.test(newPassword),
       number: /[0-9]/.test(newPassword),
       special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
     };
-    const invalidRules = Object.entries(passwordChecks).filter(([_, passed]) => !passed);
-    if (invalidRules.length > 0) return setFpError("Password does not meet all requirements");
-
+    if (Object.values(checks).some(v => !v)) return setFpError("Password does not meet all requirements");
     if (newPassword !== confirmPassword) return setFpError("Passwords don't match");
+
     setFpError('');
     try {
       const users = await fetchUsers();
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
 
-      // Hash before save
       const salt = await bcrypt.genSalt(10);
       const hashed = await bcrypt.hash(newPassword, salt);
 
@@ -184,7 +216,6 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Background and Time Info same as your code */}
       <div className="absolute inset-0">
         <img src="/rice_field.jpg" alt="Rice Field" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-emerald-900/70"></div>
@@ -200,7 +231,6 @@ export default function AdminLogin() {
         </div>
       </div>
 
-      {/* Login Card */}
       <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
         <div className="w-full max-w-sm">
           <div className="bg-white/20 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden min-h-[550px]">
@@ -213,7 +243,6 @@ export default function AdminLogin() {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Username and Password Inputs same as your code */}
               <div>
                 <label className="block text-white/80 text-sm font-medium mb-2">Username or Email</label>
                 <div className="relative">
@@ -224,9 +253,7 @@ export default function AdminLogin() {
                     value={formData.username}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    className={`w-full pl-10 pr-4 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:bg-white/20 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300/40 transition-all ${
-                      errors.username ? "border-red-400/50 focus:border-red-400/50 focus:ring-red-400/30" : ""
-                    }`}
+                    className={`w-full pl-10 pr-4 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:bg-white/20 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300/40 transition-all ${errors.username ? "border-red-400/50 focus:border-red-400/50 focus:ring-red-400/30" : ""}`}
                     placeholder="Enter your username or email"
                   />
                 </div>
@@ -244,9 +271,7 @@ export default function AdminLogin() {
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     autoComplete="new-password"
-                    className={`w-full pl-10 pr-12 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:bg-white/20 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300/40 transition-all ${
-                      errors.password ? "border-red-400/50 focus:border-red-400/50 focus:ring-red-400/30" : ""
-                    }`}
+                    className={`w-full pl-10 pr-12 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:bg-white/20 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300/40 transition-all ${errors.password ? "border-red-400/50 focus:border-red-400/50 focus:ring-red-400/30" : ""}`}
                     placeholder="Enter your password"
                   />
                   <button
@@ -301,7 +326,28 @@ export default function AdminLogin() {
         </div>
       </div>
 
-      {/*Forgot Password Modal*/}
+      {/* Restricted dialog */}
+      {showRestricted && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
+            <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3">
+              <Lock className="w-6 h-6 text-amber-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Login blocked</h3>
+            <p className="text-sm text-gray-600">{restrictedMsg}</p>
+            <div className="mt-5 flex justify-center">
+              <button
+                onClick={() => setShowRestricted(false)}
+                className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 transition-opacity animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-96 shadow-2xl transform transition-all duration-300">
@@ -370,13 +416,12 @@ export default function AdminLogin() {
                   className="w-full border p-2 rounded focus:ring-2 focus:outline-none focus:ring-green-300 transition-all"
                 />
 
-                {/* Password Requirements Checklist */}
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   {[
                     { rule: "length", label: "At least 8 characters", passed: newPassword.length >= 8 },
                     { rule: "uppercase", label: "One uppercase letter", passed: /[A-Z]/.test(newPassword) },
                     { rule: "number", label: "One number", passed: /[0-9]/.test(newPassword) },
-                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword) },
+                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?\":{}|<>]/.test(newPassword) },
                   ].map(({ rule, label, passed }) => (
                     <div key={rule} className="flex items-center gap-1">
                       {passed ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-400" />}

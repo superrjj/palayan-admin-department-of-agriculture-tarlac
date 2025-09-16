@@ -1,9 +1,10 @@
+// components/AdminManagement/index.jsx (AdminManagement)
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminHeader from '../AdminManagement/AdminHeader';
 import AdminTable from '../AdminManagement/AdminTable';
 import { useRole } from '../../contexts/RoleContext';
 import AddAdminModal from '../AdminManagement/AddAdminModal'; 
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, query, where } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
 const AdminManagement = () => {
@@ -21,9 +22,8 @@ const AdminManagement = () => {
     username: 'system',
     email: 'system@example.com'
   });
-  const itemsPerPage = 50;
+  const itemsPerPage = 20;
 
-  // Get current user from localStorage and Firestore
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
@@ -34,7 +34,6 @@ const AdminManagement = () => {
           const userDoc = await getDoc(doc(db, "accounts", adminToken));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            // Verify session
             if (userData.currentSession === sessionId) {
               setCurrentUser({
                 id: userData.id || adminToken,
@@ -42,15 +41,8 @@ const AdminManagement = () => {
                 username: userData.username || 'unknown',
                 email: userData.email || 'unknown@example.com'
               });
-              console.log("Current user loaded:", userData.fullname);
-            } else {
-              console.log("Session mismatch, using default user");
             }
-          } else {
-            console.log("User document not found, using default user");
           }
-        } else {
-          console.log("No admin token or session, using default user");
         }
       } catch (error) {
         console.error("Error fetching current user:", error);
@@ -59,44 +51,26 @@ const AdminManagement = () => {
     getCurrentUser();
   }, []);
 
-  // Realtime fetch admins from Firestore (only non-deleted)
   useEffect(() => {
-    console.log("Setting up Firestore listener for admins...");
-    
-    // Try different query approaches
     let q;
     try {
-      // First try: documents where isDeleted is explicitly false
       q = query(
         collection(db, "accounts"),
         where("isDeleted", "==", false)
       );
-      console.log("Using query with isDeleted == false");
-    } catch (error) {
-      console.log("Query with isDeleted == false failed, trying alternative...");
-      // Fallback: get all documents and filter in JavaScript
+    } catch {
       q = collection(db, "accounts");
-      console.log("Using fallback query (all documents)");
     }
     
     const unsub = onSnapshot(q, 
       (snapshot) => {
-        console.log("Snapshot received, docs count:", snapshot.docs.length);
-        
         let data = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        
-        // If we used the fallback query, filter out deleted items
-        if (q.type === 'collection') {
-          data = data.filter(item => item.isDeleted !== true);
-          console.log("Filtered out deleted items, remaining:", data.length);
-        }
-        
-        console.log("Final admins count:", data.length);
-        console.log("Admins data:", data);
-        
+        // if fallback was used, filter deleted
+        // note: q.type may not exist; safe filter always
+        data = data.filter(item => item.isDeleted !== true);
         setAdmins(data);
         setLoading(false);
       },
@@ -106,13 +80,9 @@ const AdminManagement = () => {
       }
     );
     
-    return () => {
-      console.log("Cleaning up Firestore listener");
-      unsub();
-    };
+    return () => unsub();
   }, []);
 
-  // Update lastLogin for a user
   // eslint-disable-next-line no-unused-vars
   const updateLastLogin = async (userId) => {
     try {
@@ -124,7 +94,6 @@ const AdminManagement = () => {
     }
   };
 
-  // Check inactive admins (1 week no login)
   const checkInactiveAdmins = useCallback(async () => {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -139,7 +108,6 @@ const AdminManagement = () => {
           await updateDoc(doc(db, "accounts", admin.id), {
             status: "inactive"
           });
-          console.log(`Admin ${admin.username} marked as inactive`);
         } catch (error) {
           console.error(`Failed to update status for ${admin.username}:`, error);
         }
@@ -151,7 +119,6 @@ const AdminManagement = () => {
     if (!loading) checkInactiveAdmins();
   }, [loading, checkInactiveAdmins]);
 
-  // Filtering
   const filteredAdmins = admins.filter(
     (a) =>
       (a.fullname || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -159,12 +126,10 @@ const AdminManagement = () => {
       (a.username || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedAdmins = filteredAdmins.slice(startIndex, startIndex + itemsPerPage);
   const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
 
-  // Actions
   const handleAddNew = () => {
     setEditAdmin(null);
     setIsModalOpen(true);
@@ -172,24 +137,14 @@ const AdminManagement = () => {
 
   const handleAddOrEditAdmin = async (adminData, id) => {
     try {
-      console.log("Current user when saving:", currentUser);
-      console.log("Admin data to save:", adminData);
-      
       if (id) {
-        // Get the current data before updating
         const currentAdmin = admins.find(a => a.id === id);
-        
         const updateData = {
           ...adminData,
-          isDeleted: false, // Ensure it's not deleted
+          isDeleted: false,
           updatedAt: new Date(),
         };
-        
-        console.log("Updating admin with data:", updateData);
-        
         await updateDoc(doc(db, "accounts", id), updateData);
-
-        // Log the update action
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -205,23 +160,15 @@ const AdminManagement = () => {
             after: updateData
           }
         });
-        
       } else {
         const newAdminData = {
           ...adminData,
           status: "active",
-          isDeleted: false, // Explicitly set as not deleted
+          isDeleted: false,
           createdAt: new Date(),
           lastLogin: null,
         };
-
-        console.log("Creating new admin with data:", newAdminData);
-
         const docRef = await addDoc(collection(db, "accounts"), newAdminData);
-        
-        console.log("New admin created with ID:", docRef.id);
-
-        // Log the create action
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -238,8 +185,6 @@ const AdminManagement = () => {
           }
         });
       }
-      
-      console.log("Admin saved successfully");
       setIsModalOpen(false);
       setEditAdmin(null);
     } catch (error) {
@@ -249,33 +194,20 @@ const AdminManagement = () => {
   };
 
   const handleEdit = (admin) => {
-    console.log("Editing admin:", admin);
     setEditAdmin(admin);
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
     try {
-      console.log("Deleting admin with ID:", id);
       setSuccessDelete(true);
-
-      // Get the admin data before soft delete
       const adminToDelete = admins.find(a => a.id === id);
-      console.log("Admin to delete:", adminToDelete);
-
       setTimeout(async () => {
-        console.log("Current user when deleting:", currentUser);
-        
-        // Soft delete - update with isDeleted flag instead of actual delete
         await updateDoc(doc(db, "accounts", id), {
           isDeleted: true,
           deletedAt: new Date(),
           deletedBy: currentUser.id
         });
-        
-        console.log("Admin soft deleted successfully");
-        
-        // Log the delete action
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -291,14 +223,40 @@ const AdminManagement = () => {
             after: null
           }
         });
-
-        // Remove from local state
         setAdmins((prev) => prev.filter((a) => a.id !== id));
         setSuccessDelete(false);
       }, 1000);
     } catch (error) {
       console.error("Failed to delete admin:", error);
       alert("Error deleting admin: " + error.message);
+    }
+  };
+
+  const handleToggleRestriction = async (id, nextActive, targetRow) => {
+    try {
+      const prev = admins.find(a => a.id === id) || targetRow;
+      const updateData = {
+        status: nextActive ? 'active' : 'inactive',
+        isRestricted: !nextActive,
+        restrictedAt: nextActive ? null : serverTimestamp(),
+        updatedAt: new Date()
+      };
+      await updateDoc(doc(db, "accounts", id), updateData);
+      await addDoc(collection(db, "audit_logs"), {
+        userId: currentUser.id,
+        userName: currentUser.fullname,
+        userEmail: currentUser.email,
+        timestamp: new Date(),
+        action: nextActive ? 'UNRESTRICT' : 'RESTRICT',
+        collection: 'accounts',
+        documentId: id,
+        documentName: prev?.fullname || prev?.username || 'Unknown',
+        description: nextActive ? 'Unrestricted admin account' : 'Restricted admin account',
+        changes: { before: { status: prev?.status }, after: { status: updateData.status } }
+      });
+    } catch (e) {
+      console.error('Failed to toggle restriction:', e);
+      alert('Failed to update restriction: ' + (e.message || e));
     }
   };
 
@@ -315,6 +273,7 @@ const AdminManagement = () => {
         loading={loading}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onToggleRestriction={handleToggleRestriction}
         currentPage={currentPage}
         totalPages={totalPages}
         setCurrentPage={setCurrentPage}
@@ -331,7 +290,6 @@ const AdminManagement = () => {
         />
       )}
 
-      {/* Success Delete Animation */}
       {successDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">

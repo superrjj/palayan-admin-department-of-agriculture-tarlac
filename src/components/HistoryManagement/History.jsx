@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Eye, Edit, Trash2, Plus, Clock, Database, Activity, User } from 'lucide-react';
+import { Eye, Edit, Trash2, Plus, Clock, Database, Activity, User, Lock, Unlock } from 'lucide-react';
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useRole } from '../../contexts/RoleContext';
 import { db } from '../../firebase/config';
@@ -17,13 +17,14 @@ const History = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
 
-  // Auto-refresh relative times (every 30s; change to 1000 for every second)
+  // Actions that should be visible only to system admins
+  const hiddenForRegular = useMemo(() => new Set(['LOGIN_BLOCKED', 'RESTRICT', 'UNRESTRICT']), []);
+
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
 
-  // Helpers for timestamps
   const toDateSafe = (timestamp) => {
     if (!timestamp) return null;
     try {
@@ -49,7 +50,7 @@ const History = () => {
   const formatShortRelative = (timestamp, now = Date.now()) => {
     const date = toDateSafe(timestamp);
     if (!date || isNaN(date.getTime())) return 'Invalid';
-    const diff = Math.max(0, Math.floor((now - date.getTime()) / 1000)); // seconds
+    const diff = Math.max(0, Math.floor((now - date.getTime()) / 1000));
     if (diff < 60) return `${diff || 1}s`;
     const m = Math.floor(diff / 60);
     if (m < 60) return `${m}m`;
@@ -59,31 +60,24 @@ const History = () => {
     return `${d}d`;
   };
 
-  //Complete fetchLogs function with proper query execution
   useEffect(() => {
     const fetchLogs = () => {
       let q;
-      
       if (isSystemAdmin()) {
-        // System Admin can see all logs
         q = query(collection(db, "audit_logs"), orderBy("timestamp", "desc"));
       } else {
-        // Regular Admin can only see their own logs
         q = query(
           collection(db, "audit_logs"),
           where("userId", "==", userInfo?.id),
           orderBy("timestamp", "desc")
         );
       }
-      
       return onSnapshot(q, 
         (snapshot) => {
           const data = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
-          console.log("Audit logs loaded:", data.length);
-          console.log("Sample actions:", data.slice(0, 10).map(log => log.action));
           setAuditLogs(data);
           setIsLoading(false);
         }, 
@@ -93,27 +87,23 @@ const History = () => {
         }
       );
     };
-    
     if (userInfo?.id) {
       const unsubscribe = fetchLogs();
       return () => unsubscribe();
     }
   }, [userInfo?.id, isSystemAdmin]);
 
-  // Get unique collections from actual data
   const collections = useMemo(() => {
     const uniqueCollections = [...new Set(auditLogs.map(log => log.collection).filter(Boolean))];
     return uniqueCollections.sort();
   }, [auditLogs]);
 
-  // Get unique actions from actual data
   const actions = useMemo(() => {
-    const uniqueActions = [...new Set(auditLogs.map(log => log.action).filter(Boolean))];
-    console.log("Unique actions found:", uniqueActions);
+    let uniqueActions = [...new Set(auditLogs.map(log => (log.action || '').toUpperCase()).filter(Boolean))];
+    if (!isSystemAdmin()) uniqueActions = uniqueActions.filter(a => !hiddenForRegular.has(a));
     return uniqueActions.sort();
-  }, [auditLogs]);
+  }, [auditLogs, isSystemAdmin, hiddenForRegular]);
 
-  // Get unique users from actual data
   const users = useMemo(() => {
     const uniqueUsers = [...new Set(auditLogs.map(log => log.userName).filter(Boolean))];
     return uniqueUsers.sort();
@@ -121,15 +111,20 @@ const History = () => {
 
   const filteredLogs = useMemo(() => {
     return auditLogs.filter(log => {
+      const actionUpper = (log.action || '').toUpperCase();
+
+      // Hide private/system-only actions for regular admins
+      if (!isSystemAdmin() && hiddenForRegular.has(actionUpper)) return false;
+
       const matchesSearch = 
-        log.documentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.userName?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesAction = selectedAction === 'ALL' || log.action === selectedAction;
+        (log.documentName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.userName || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesAction = selectedAction === 'ALL' || actionUpper === selectedAction;
       const matchesCollection = selectedCollection === 'ALL' || log.collection === selectedCollection;
       const matchesUser = selectedUser === 'ALL' || log.userName === selectedUser;
-      
+
       let matchesDate = true;
       if (dateRange !== 'ALL') {
         const now = new Date();
@@ -146,17 +141,12 @@ const History = () => {
             break;
         }
       }
-      
       return matchesSearch && matchesAction && matchesCollection && matchesUser && matchesDate;
     });
-  }, [auditLogs, searchTerm, selectedAction, selectedCollection, selectedUser, dateRange]);
+  }, [auditLogs, searchTerm, selectedAction, selectedCollection, selectedUser, dateRange, isSystemAdmin, hiddenForRegular]);
 
   const getActionIcon = (action) => {
-    console.log("Getting icon for action:", action);
-    
-    // Normalize action to uppercase for comparison
     const normalizedAction = action?.toUpperCase();
-    
     switch (normalizedAction) {
       case 'CREATE':
       case 'ADD':
@@ -173,16 +163,18 @@ const History = () => {
       case 'REMOVE':
       case 'REMOVED':
         return <Trash2 className="w-4 h-4 text-red-600" />;
-      default: 
-        console.log("Unknown action:", action);
+      case 'RESTRICT':
+      case 'LOGIN_BLOCKED':
+        return <Lock className="w-4 h-4 text-amber-600" />;
+      case 'UNRESTRICT':
+        return <Unlock className="w-4 h-4 text-emerald-600" />;
+      default:
         return <Activity className="w-4 h-4 text-gray-600" />;
     }
   };
 
   const getActionColor = (action) => {
-    // Normalize action to uppercase for comparison
     const normalizedAction = action?.toUpperCase();
-    
     switch (normalizedAction) {
       case 'CREATE':
       case 'ADD':
@@ -199,7 +191,12 @@ const History = () => {
       case 'REMOVE':
       case 'REMOVED':
         return 'bg-red-100 text-red-800 border-red-200';
-      default: 
+      case 'RESTRICT':
+      case 'LOGIN_BLOCKED':
+        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'UNRESTRICT':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -210,7 +207,7 @@ const History = () => {
       ...filteredLogs.map(log => [
         formatTimestamp(log.timestamp),
         log.userName || 'Unknown User',
-        log.action,
+        (log.action || '').toUpperCase(),
         log.collection,
         log.documentName || 'Unknown Document',
         log.description
@@ -227,7 +224,6 @@ const History = () => {
 
   return (
     <div className="p-4 lg:p-6">
-      {/* Header */}
       <HistoryHeader
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -249,21 +245,16 @@ const History = () => {
         actions={actions}
       />
 
-      {/* History Logs */}
       <div className="space-y-3">
         {filteredLogs.map((log) => (
           <div key={log.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-            {/* Main Log Row */}
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
-                  {/* Action Badge */}
                   <div className={`flex items-center gap-2 px-2 py-1 rounded-full border text-xs ${getActionColor(log.action)}`}>
                     {getActionIcon(log.action)}
-                    <span className="font-semibold">{log.action}</span>
+                    <span className="font-semibold">{(log.action || '').toUpperCase()}</span>
                   </div>
-
-                  {/* Main Content - Pantay na positioning */}
                   <div className="flex-1 min-w-0 ml-4">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-gray-900 truncate text-sm">
@@ -277,8 +268,6 @@ const History = () => {
                     <p className="text-sm text-gray-600 truncate ml-0">{log.description || 'No description'}</p>
                   </div>
                 </div>
-
-                {/* Timestamp (short relative + full on hover) */}
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Clock className="w-4 h-4" />
                   <span title={formatTimestamp(log.timestamp)}>

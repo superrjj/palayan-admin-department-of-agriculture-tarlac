@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Wheat, Bug, Shield, Users, Activity } from 'lucide-react';
 import {
   collection,
@@ -16,15 +16,32 @@ const Dashboard = () => {
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalVarieties, setTotalVarieties] = useState(0);
   const [totalPests, setTotalPests] = useState(0);
-  const [recentActivities, setRecentActivities] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('recentActivities') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  const [recentActivities, setRecentActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const { userInfo } = useRole();
+
+  // keep track of active unsub to swap actor field cleanly
+  const activitiesUnsubRef = useRef(null);
+  const triedFieldsRef = useRef([]);
+
+  const getActivitiesStorageKey = (uid) => `recentActivities:${uid}`;
+
+  // Preload from session cache ASAP using admin_token
+  useEffect(() => {
+    const cachedUid = localStorage.getItem('admin_token');
+    if (!cachedUid) return;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(getActivitiesStorageKey(cachedUid)) || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        setRecentActivities(cached);
+        setActivitiesLoading(false);
+      }
+    } catch {}
+    // Cleanup the old global key if it exists (avoid cross-user leakage)
+    try {
+      localStorage.removeItem('recentActivities');
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const adminsQ = query(
@@ -69,22 +86,58 @@ const Dashboard = () => {
     };
   }, []);
 
+  // Subscribe to recent activities, trying different actor fields if needed
   useEffect(() => {
-    if (!userInfo?.id) {
+    const uid = userInfo?.id;
+    if (!uid) {
       setActivitiesLoading(true);
       return;
     }
 
-    setActivitiesLoading(true);
+    // Load session-scoped cache for this uid immediately
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(getActivitiesStorageKey(uid)) || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        setRecentActivities(cached);
+        setActivitiesLoading(false);
+      } else {
+        setActivitiesLoading(true);
+      }
+    } catch {
+      setActivitiesLoading(true);
+    }
+
+    // reset tried fields and subscribe
+    triedFieldsRef.current = [];
+    subscribeForActorField(uid, 'userId');
+
+    return () => {
+      if (activitiesUnsubRef.current) {
+        activitiesUnsubRef.current();
+        activitiesUnsubRef.current = null;
+      }
+    };
+  }, [userInfo?.id]);
+
+  const subscribeForActorField = (uid, field) => {
+    // avoid retrying same field
+    if (triedFieldsRef.current.includes(field)) return;
+    triedFieldsRef.current.push(field);
+
+    // cleanup previous listener
+    if (activitiesUnsubRef.current) {
+      activitiesUnsubRef.current();
+      activitiesUnsubRef.current = null;
+    }
 
     const activitiesQ = query(
       collection(db, 'audit_logs'),
-      where('userId', '==', userInfo.id),
+      where(field, '==', uid),
       orderBy('timestamp', 'desc'),
       fbLimit(5)
     );
 
-    const unsubActivities = onSnapshot(
+    activitiesUnsubRef.current = onSnapshot(
       activitiesQ,
       (snap) => {
         const items = snap.docs.map((d) => {
@@ -105,20 +158,37 @@ const Dashboard = () => {
             time: ts.toLocaleString()
           };
         });
+
+        if (items.length === 0) {
+          // try next possible field if any
+          if (field === 'userId') subscribeForActorField(uid, 'actorId');
+          else if (field === 'actorId') subscribeForActorField(uid, 'performedBy');
+          else {
+            setRecentActivities([]);
+            setActivitiesLoading(false);
+            // cache empty so UI is deterministic
+            try {
+              sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify([]));
+            } catch {}
+          }
+          return;
+        }
+
         setRecentActivities(items);
         try {
-          localStorage.setItem('recentActivities', JSON.stringify(items));
+          sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify(items));
         } catch {}
         setActivitiesLoading(false);
       },
       (err) => {
         console.error('Recent activities error:', err);
-        setActivitiesLoading(false);
+        // on error, attempt the next field too
+        if (field === 'userId') subscribeForActorField(uid, 'actorId');
+        else if (field === 'actorId') subscribeForActorField(uid, 'performedBy');
+        else setActivitiesLoading(false);
       }
     );
-
-    return () => unsubActivities();
-  }, [userInfo?.id]);
+  };
 
   const buildActivityLabel = (log) => {
     const docName = log.documentName || log.name || 'Unknown';

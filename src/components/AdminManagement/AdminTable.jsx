@@ -1,11 +1,13 @@
+// components/AdminManagement/AdminTable.jsx
 import React from 'react';
-import { Edit2, Trash2, UserCheck, Shield, Users } from 'lucide-react';
+import { Trash2, UserCheck, Shield, Users, Lock, Unlock } from 'lucide-react';
 
 const AdminTable = ({ 
   admins, 
   loading, 
-  onEdit, 
+  onEdit,   // kept for compatibility (unused here)
   onDelete, 
+  onToggleRestriction, // (id, nextActiveBool, row) => void
   currentPage, 
   totalPages, 
   setCurrentPage 
@@ -42,7 +44,7 @@ const AdminTable = ({
               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Created Date</th>
               <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
-              <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -62,63 +64,65 @@ const AdminTable = ({
                 </td>
               </tr>
             ) : (
-              admins.map((admin) => (
-                <tr key={admin.id} className="hover:bg-gray-50 transition-all">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{admin.fullname}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{admin.email}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{admin.username}</td>
-                  <td className="px-6 py-4">{getRoleBadge(admin.role)}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full font-medium ${
-                        (admin.status?.toLowerCase() === 'active' || admin.status === true)
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {(admin.status?.toLowerCase() === 'active' || admin.status === true)
-                        ? 'Active'
-                        : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {admin.createdAt?.toDate
-                      ? admin.createdAt.toDate().toLocaleString()
-                      : admin.createdAt
-                      ? new Date(admin.createdAt).toLocaleString()
-                      : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {admin.lastLogin?.toDate
-                      ? admin.lastLogin.toDate().toLocaleString()
-                      : admin.lastLogin
-                      ? new Date(admin.lastLogin).toLocaleString()
-                      : '—'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={() => onEdit(admin)}
-                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
+              admins.map((admin) => {
+                const isActive = (admin.status?.toLowerCase?.() === 'active') || admin.status === true;
+                return (
+                  <tr key={admin.id} className="hover:bg-gray-50 transition-all">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{admin.fullname}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{admin.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{admin.username}</td>
+                    <td className="px-6 py-4">{getRoleBadge(admin.role)}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}
                       >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(admin.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {isActive ? 'Active' : 'Restricted'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {admin.createdAt?.toDate
+                        ? admin.createdAt.toDate().toLocaleString()
+                        : admin.createdAt
+                        ? new Date(admin.createdAt).toLocaleString()
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {admin.lastLogin?.toDate
+                        ? admin.lastLogin.toDate().toLocaleString()
+                        : admin.lastLogin
+                        ? new Date(admin.lastLogin).toLocaleString()
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center space-x-2">
+                        <button
+                          onClick={() => onToggleRestriction?.(admin.id, !isActive, admin)}
+                          className={`p-2 rounded-lg transition ${isActive ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'}`}
+                          aria-label={isActive ? 'Restrict' : 'Unrestrict'}
+                          title={isActive ? 'Restrict' : 'Unrestrict'}
+                        >
+                          {isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => onDelete(admin.id)}
+                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
+                          aria-label="Delete"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="bg-gray-50 px-4 lg:px-6 py-4 border-t border-gray-200 flex justify-between items-center">
           <button
