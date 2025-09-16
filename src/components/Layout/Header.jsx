@@ -6,6 +6,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth, updateEmail, sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const Header = ({ setIsSidebarOpen }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -199,6 +200,40 @@ const Header = ({ setIsSidebarOpen }) => {
   );
 };
 
+// Helpers for image handling and compression
+const dataURLToImage = (dataUrl) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
+// Resize and compress to JPEG Blob
+const compressDataUrlToBlob = async (dataUrl, maxSide = 512, quality = 0.85) => {
+  const img = await dataURLToImage(dataUrl);
+  const w = img.width;
+  const h = img.height;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const tw = Math.max(1, Math.round(w * scale));
+  const th = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, tw, th);
+
+  let q = quality;
+  let blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', q));
+  while (blob && blob.size > 900 * 1024 && q > 0.4) {
+    q -= 0.1;
+    blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', q));
+  }
+  if (!blob) throw new Error('Failed to compress image.');
+  return blob;
+};
+
 const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
   const [fullname, setFullname] = useState(initialData.fullname || '');
   const [email, setEmail] = useState(initialData.email || '');
@@ -285,7 +320,8 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
       cropPixels.width,
       cropPixels.height
     );
-    return canvas.toDataURL('image/png');
+    // Keep preview reasonable size; JPEG reduces memory usage
+    return canvas.toDataURL('image/jpeg', 0.9);
   };
 
   const confirmCrop = async () => {
@@ -324,9 +360,15 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
         contactNo: contact.trim(),
       };
 
-      // Save cropped preview (data URL) as photoURL for now
+      // If there's a new/updated preview, upload to Storage and store only the download URL
       if (photoPreview && (photoFile || !initialData.photoURL || photoPreview !== initialData.photoURL)) {
-        nextFields.photoURL = photoPreview;
+        const blob = await compressDataUrlToBlob(photoPreview, 512, 0.85);
+        const storage = getStorage();
+        const filePath = `avatars/${userId}/avatar_${Date.now()}.jpg`;
+        const objectRef = storageRef(storage, filePath);
+        await uploadBytes(objectRef, blob);
+        const downloadURL = await getDownloadURL(objectRef);
+        nextFields.photoURL = downloadURL;
       }
 
       await updateDoc(doc(db, 'accounts', userId), nextFields);
@@ -404,10 +446,8 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
                           setCrop({ x: 0, y: 0 });
                         }
                       }}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
                     >
-                      <CropIcon className="h-4 w-4" />
-                      Re-crop
+                      
                     </button>
                   )}
                 </div>
