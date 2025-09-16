@@ -19,6 +19,7 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   const isEdit = !!adminData;
 
   const [usernameStatus, setUsernameStatus] = useState({ checking: false, ok: false, msg: "" });
+  const [emailStatus, setEmailStatus] = useState({ checking: false, ok: false, msg: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -36,8 +37,9 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     setUsernameStatus({ checking: true, ok: false, msg: "" });
     const t = setTimeout(async () => {
       try {
-        const q = query(collection(db, "accounts"), where("username", "==", value));
-        const snap = await getDocs(q);
+        const qUser = query(collection(db, "accounts"), where("username", "==", value));
+        const snap = await getDocs(qUser);
+        // block reuse even if isDeleted === true
         const conflict = snap.docs.find(d => d.id !== (adminData?.id || ""));
         if (!cancelled) {
           if (conflict) {
@@ -57,6 +59,57 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     };
   }, [formData.username, adminData?.id]);
 
+  // Email uniqueness (case-insensitive) and format check; block reuse even if deleted
+  useEffect(() => {
+    let cancelled = false;
+    const raw = (formData.email || "").trim();
+    const value = raw.toLowerCase();
+
+    if (!raw) {
+      setEmailStatus({ checking: false, ok: false, msg: "" });
+      return;
+    }
+    // basic RFC5322-lite check
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+    if (!emailOk) {
+      setEmailStatus({ checking: false, ok: false, msg: "Enter a valid email address" });
+      return;
+    }
+
+    setEmailStatus({ checking: true, ok: false, msg: "" });
+    const t = setTimeout(async () => {
+      try {
+        // prefer normalizedEmail if stored; also check email field for safety
+        const q1 = query(collection(db, "accounts"), where("normalizedEmail", "==", value));
+        const q2 = query(collection(db, "accounts"), where("email", "==", raw));
+        const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+        // merge doc ids
+        const hits = new Map();
+        s1.docs.forEach(d => { hits.set(d.id, d); });
+        s2.docs.forEach(d => { hits.set(d.id, d); });
+
+        // conflict if any doc with different id exists (even if isDeleted true)
+        const conflict = Array.from(hits.values()).find(d => d.id !== (adminData?.id || ""));
+
+        if (!cancelled) {
+          if (conflict) {
+            setEmailStatus({ checking: false, ok: false, msg: "Email is already in use" });
+          } else {
+            setEmailStatus({ checking: false, ok: true, msg: "Email is available" });
+          }
+        }
+      } catch {
+        if (!cancelled) setEmailStatus({ checking: false, ok: false, msg: "Could not verify email" });
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [formData.email, adminData?.id]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -71,6 +124,7 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!usernameStatus.ok || usernameStatus.checking) return;
+    if (!emailStatus.ok || emailStatus.checking) return;
 
     let passwordToSave = formData.password;
     try {
@@ -89,6 +143,8 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
         ...formData,
         username: formData.username.trim(),
         normalizedUsername: formData.username.trim().toLowerCase(),
+        email: formData.email.trim(),
+        normalizedEmail: formData.email.trim().toLowerCase(),
         password: passwordToSave
       },
       adminData?.id
@@ -148,6 +204,14 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
                 placeholder="example@email.com"
                 required
               />
+            </div>
+            <div className="mt-1 text-xs">
+              {emailStatus.checking && <span className="text-gray-500">Checking...</span>}
+              {!emailStatus.checking && emailStatus.msg && (
+                <span className={emailStatus.ok ? 'text-green-600' : 'text-red-600'}>
+                  {emailStatus.msg}
+                </span>
+              )}
             </div>
           </div>
 
@@ -255,8 +319,8 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</button>
             <button
               type="submit"
-              disabled={!usernameStatus.ok || usernameStatus.checking}
-              className={`px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md ${(!usernameStatus.ok || usernameStatus.checking) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!usernameStatus.ok || usernameStatus.checking || !emailStatus.ok || emailStatus.checking}
+              className={`px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md ${(!usernameStatus.ok || usernameStatus.checking || !emailStatus.ok || emailStatus.checking) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {isEdit ? "Update" : "Save"}
             </button>
