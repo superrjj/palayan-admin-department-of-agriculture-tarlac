@@ -16,17 +16,18 @@ const Dashboard = () => {
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalVarieties, setTotalVarieties] = useState(0);
   const [totalPests, setTotalPests] = useState(0);
+
   const [recentActivities, setRecentActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [activitiesResolved, setActivitiesResolved] = useState(false);
+
   const { userInfo } = useRole();
 
-  // keep track of active unsub to swap actor field cleanly
   const activitiesUnsubRef = useRef(null);
   const triedFieldsRef = useRef([]);
 
   const getActivitiesStorageKey = (uid) => `recentActivities:${uid}`;
 
-  // Preload from session cache ASAP using admin_token
   useEffect(() => {
     const cachedUid = localStorage.getItem('admin_token');
     if (!cachedUid) return;
@@ -34,10 +35,8 @@ const Dashboard = () => {
       const cached = JSON.parse(sessionStorage.getItem(getActivitiesStorageKey(cachedUid)) || '[]');
       if (Array.isArray(cached) && cached.length > 0) {
         setRecentActivities(cached);
-        setActivitiesLoading(false);
       }
     } catch {}
-    // Cleanup the old global key if it exists (avoid cross-user leakage)
     try {
       localStorage.removeItem('recentActivities');
     } catch {}
@@ -50,33 +49,16 @@ const Dashboard = () => {
       where('status', '==', 'active'),
       where('role', 'in', ['SYSTEM_ADMIN', 'ADMIN'])
     );
-    const unsubAdmins = onSnapshot(adminsQ, (snap) => {
-      setTotalAdmins(snap.size);
-    });
+    const unsubAdmins = onSnapshot(adminsQ, (snap) => setTotalAdmins(snap.size));
 
-    const diseasesQ = query(
-      collection(db, 'rice_local_diseases'),
-      where('isDeleted', '==', false)
-    );
-    const unsubDiseases = onSnapshot(diseasesQ, (snap) => {
-      setTotalDiseases(snap.size);
-    });
+    const diseasesQ = query(collection(db, 'rice_local_diseases'), where('isDeleted', '==', false));
+    const unsubDiseases = onSnapshot(diseasesQ, (snap) => setTotalDiseases(snap.size));
 
-    const varietiesQ = query(
-      collection(db, 'rice_seed_varieties'),
-      where('isDeleted', '==', false)
-    );
-    const unsubVarieties = onSnapshot(varietiesQ, (snap) => {
-      setTotalVarieties(snap.size);
-    });
+    const varietiesQ = query(collection(db, 'rice_seed_varieties'), where('isDeleted', '==', false));
+    const unsubVarieties = onSnapshot(varietiesQ, (snap) => setTotalVarieties(snap.size));
 
-    const pestsQ = query(
-      collection(db, 'rice_local_pests'),
-      where('isDeleted', '==', false)
-    );
-    const unsubPests = onSnapshot(pestsQ, (snap) => {
-      setTotalPests(snap.size);
-    });
+    const pestsQ = query(collection(db, 'rice_local_pests'), where('isDeleted', '==', false));
+    const unsubPests = onSnapshot(pestsQ, (snap) => setTotalPests(snap.size));
 
     return () => {
       unsubAdmins();
@@ -86,28 +68,26 @@ const Dashboard = () => {
     };
   }, []);
 
-  // Subscribe to recent activities, trying different actor fields if needed
   useEffect(() => {
     const uid = userInfo?.id;
     if (!uid) {
       setActivitiesLoading(true);
+      setActivitiesResolved(false);
       return;
     }
 
-    // Load session-scoped cache for this uid immediately
     try {
       const cached = JSON.parse(sessionStorage.getItem(getActivitiesStorageKey(uid)) || '[]');
       if (Array.isArray(cached) && cached.length > 0) {
         setRecentActivities(cached);
-        setActivitiesLoading(false);
-      } else {
-        setActivitiesLoading(true);
       }
+      setActivitiesLoading(true);
+      setActivitiesResolved(false);
     } catch {
       setActivitiesLoading(true);
+      setActivitiesResolved(false);
     }
 
-    // reset tried fields and subscribe
     triedFieldsRef.current = [];
     subscribeForActorField(uid, 'userId');
 
@@ -120,74 +100,95 @@ const Dashboard = () => {
   }, [userInfo?.id]);
 
   const subscribeForActorField = (uid, field) => {
-    // avoid retrying same field
     if (triedFieldsRef.current.includes(field)) return;
     triedFieldsRef.current.push(field);
 
-    // cleanup previous listener
     if (activitiesUnsubRef.current) {
       activitiesUnsubRef.current();
       activitiesUnsubRef.current = null;
     }
 
-    const activitiesQ = query(
+    const withOrder = query(
       collection(db, 'audit_logs'),
       where(field, '==', uid),
       orderBy('timestamp', 'desc'),
       fbLimit(5)
     );
 
+    // primary listener with orderBy (fast, needs composite index)
     activitiesUnsubRef.current = onSnapshot(
-      activitiesQ,
-      (snap) => {
-        const items = snap.docs.map((d) => {
-          const data = d.data();
-          const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
-          const type =
-            data.collection === 'rice_local_pests'
-              ? 'pest'
-              : data.collection === 'rice_local_diseases'
-              ? 'disease'
-              : data.collection === 'rice_seed_varieties'
-              ? 'variety'
-              : 'admin';
-          return {
-            id: d.id,
-            type,
-            action: buildActivityLabel(data),
-            time: ts.toLocaleString()
-          };
-        });
-
-        if (items.length === 0) {
-          // try next possible field if any
-          if (field === 'userId') subscribeForActorField(uid, 'actorId');
-          else if (field === 'actorId') subscribeForActorField(uid, 'performedBy');
-          else {
-            setRecentActivities([]);
-            setActivitiesLoading(false);
-            // cache empty so UI is deterministic
-            try {
-              sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify([]));
-            } catch {}
-          }
+      withOrder,
+      (snap) => handleSnapshot(uid, field, snap),
+      (err) => {
+        // If missing index, fallback to query without orderBy and sort client-side
+        if (err?.code === 'failed-precondition') {
+          const withoutOrder = query(collection(db, 'audit_logs'), where(field, '==', uid), fbLimit(20));
+          activitiesUnsubRef.current = onSnapshot(
+            withoutOrder,
+            (snap) => handleSnapshot(uid, field, snap, { sortClient: true }),
+            (fallbackErr) => {
+              console.error('Activities fallback error:', fallbackErr);
+              tryNextFieldOrResolveEmpty(uid, field);
+            }
+          );
           return;
         }
-
-        setRecentActivities(items);
-        try {
-          sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify(items));
-        } catch {}
-        setActivitiesLoading(false);
-      },
-      (err) => {
         console.error('Recent activities error:', err);
-        // on error, attempt the next field too
-        if (field === 'userId') subscribeForActorField(uid, 'actorId');
-        else if (field === 'actorId') subscribeForActorField(uid, 'performedBy');
-        else setActivitiesLoading(false);
+        tryNextFieldOrResolveEmpty(uid, field);
       }
     );
+  };
+
+  const handleSnapshot = (uid, field, snap, opts = {}) => {
+    const items = snap.docs.map((d) => {
+      const data = d.data();
+      const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+      const type =
+        data.collection === 'rice_local_pests'
+          ? 'pest'
+          : data.collection === 'rice_local_diseases'
+          ? 'disease'
+          : data.collection === 'rice_seed_varieties'
+          ? 'variety'
+          : 'admin';
+      return {
+        id: d.id,
+        type,
+        action: buildActivityLabel(data),
+        time: ts.toLocaleString(),
+        _ts: ts.getTime()
+      };
+    });
+
+    const sorted = opts.sortClient ? items.sort((a, b) => b._ts - a._ts) : items;
+    const limited = sorted.slice(0, 5);
+
+    if (limited.length === 0) {
+      tryNextFieldOrResolveEmpty(uid, field);
+      return;
+    }
+
+    setRecentActivities(limited.map(({ _ts, ...rest }) => rest));
+    try {
+      sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify(limited.map(({ _ts, ...rest }) => rest)));
+    } catch {}
+    setActivitiesLoading(false);
+    setActivitiesResolved(true);
+  };
+
+  const tryNextFieldOrResolveEmpty = (uid, field) => {
+    if (field === 'userId') {
+      subscribeForActorField(uid, 'actorId');
+    } else if (field === 'actorId') {
+      subscribeForActorField(uid, 'performedBy');
+    } else {
+      setRecentActivities([]);
+      setActivitiesLoading(false);
+      setActivitiesResolved(true);
+      try {
+        sessionStorage.setItem(getActivitiesStorageKey(uid), JSON.stringify([]));
+      } catch {}
+    }
   };
 
   const buildActivityLabel = (log) => {
@@ -270,9 +271,14 @@ const Dashboard = () => {
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
           <Activity className="h-5 w-5 mr-2" />
           Recent Activities
+          {activitiesLoading && (
+            <span className="ml-2 inline-flex items-center">
+              <span className="h-4 w-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+            </span>
+          )}
         </h2>
         <div className="space-y-4">
-          {activitiesLoading && recentActivities.length === 0 ? (
+          {!activitiesResolved ? (
             <div className="space-y-2">
               <div className="h-12 bg-gray-100 animate-pulse rounded" />
               <div className="h-12 bg-gray-100 animate-pulse rounded" />
