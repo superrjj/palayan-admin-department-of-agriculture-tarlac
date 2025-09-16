@@ -5,9 +5,9 @@ import { Trash2, UserCheck, Shield, Users, Lock, Unlock } from 'lucide-react';
 const AdminTable = ({ 
   admins, 
   loading, 
-  onEdit,   // kept for compatibility (unused here)
+  onEdit,   
   onDelete, 
-  onToggleRestriction, // (id, nextActiveBool, row) => void
+  onToggleRestriction, //void
   currentPage, 
   totalPages, 
   setCurrentPage,
