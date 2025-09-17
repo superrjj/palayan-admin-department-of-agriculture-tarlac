@@ -11,6 +11,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'fire
 const Header = ({ setIsSidebarOpen }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -21,12 +22,20 @@ const Header = ({ setIsSidebarOpen }) => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const userId = localStorage.getItem('admin_token');
-      if (userId) {
-        const userDoc = await getDoc(doc(db, 'accounts', userId));
-        if (userDoc.exists()) {
-          setUserData({ id: userId, ...userDoc.data() });
+      try {
+        const userId = localStorage.getItem('admin_token');
+        if (userId) {
+          const userDoc = await getDoc(doc(db, 'accounts', userId));
+          if (userDoc.exists()) {
+            setUserData({ id: userId, ...userDoc.data() });
+          } else {
+            setUserData(null);
+          }
+        } else {
+          setUserData(null);
         }
+      } finally {
+        setIsUserLoading(false);
       }
     };
     fetchUserData();
@@ -95,25 +104,28 @@ const Header = ({ setIsSidebarOpen }) => {
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center space-x-3 text-green-700 hover:text-green-900 p-2 rounded-lg hover:bg-green-100"
             >
-              <div className="w-10 h-10 bg-green-700 rounded-full overflow-hidden flex items-center justify-center">
-                {userData?.photoURL ? (
-                  <img src={userData.photoURL} alt="avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-sm font-medium">
-                    {getInitials(userData?.fullname || 'User')}
-                  </span>
-                )}
-              </div>
-              <div className="hidden sm:block text-left">
-                {userData ? (
-                  <>
+              {isUserLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-green-700" />
+                  <span className="text-sm font-medium text-gray-500">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="w-10 h-10 bg-green-700 rounded-full overflow-hidden flex items-center justify-center">
+                    {userData?.photoURL ? (
+                      <img src={userData.photoURL} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-sm font-medium">
+                        {getInitials(userData?.fullname || '') || 'U'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium">{userData.fullname}</p>
                     <p className="text-xs text-gray-500">{userData.role}</p>
-                  </>
-                ) : (
-                  <p className="text-sm font-medium text-gray-400 animate-pulse">Loading...</p>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
               <ChevronDown
                 className={`h-4 w-4 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : 'rotate-0'}`}
               />
