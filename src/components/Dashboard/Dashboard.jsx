@@ -43,6 +43,7 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    // Admins: keep Firestore-side filter (schema consistent)
     const adminsQ = query(
       collection(db, 'accounts'),
       where('isDeleted', '==', false),
@@ -51,14 +52,23 @@ const Dashboard = () => {
     );
     const unsubAdmins = onSnapshot(adminsQ, (snap) => setTotalAdmins(snap.size));
 
-    const diseasesQ = query(collection(db, 'rice_local_diseases'), where('isDeleted', '==', false));
-    const unsubDiseases = onSnapshot(diseasesQ, (snap) => setTotalDiseases(snap.size));
+    // Diseases: count docs where isDeleted !== true (include missing and false)
+    const diseasesQ = collection(db, 'rice_local_diseases');
+    const unsubDiseases = onSnapshot(diseasesQ, (snap) => {
+      const count = snap.docs.reduce((n, d) => n + (d.data().isDeleted !== true ? 1 : 0), 0);
+      setTotalDiseases(count);
+    });
 
+    // Varieties: keep Firestore-side filter (schema consistent)
     const varietiesQ = query(collection(db, 'rice_seed_varieties'), where('isDeleted', '==', false));
     const unsubVarieties = onSnapshot(varietiesQ, (snap) => setTotalVarieties(snap.size));
 
-    const pestsQ = query(collection(db, 'rice_local_pests'), where('isDeleted', '==', false));
-    const unsubPests = onSnapshot(pestsQ, (snap) => setTotalPests(snap.size));
+    // Pests: count docs where isDeleted !== true (include missing and false)
+    const pestsQ = collection(db, 'rice_local_pests');
+    const unsubPests = onSnapshot(pestsQ, (snap) => {
+      const count = snap.docs.reduce((n, d) => n + (d.data().isDeleted !== true ? 1 : 0), 0);
+      setTotalPests(count);
+    });
 
     return () => {
       unsubAdmins();
@@ -115,12 +125,10 @@ const Dashboard = () => {
       fbLimit(5)
     );
 
-    // primary listener with orderBy (fast, needs composite index)
     activitiesUnsubRef.current = onSnapshot(
       withOrder,
       (snap) => handleSnapshot(uid, field, snap),
       (err) => {
-        // If missing index, fallback to query without orderBy and sort client-side
         if (err?.code === 'failed-precondition') {
           const withoutOrder = query(collection(db, 'audit_logs'), where(field, '==', uid), fbLimit(20));
           activitiesUnsubRef.current = onSnapshot(

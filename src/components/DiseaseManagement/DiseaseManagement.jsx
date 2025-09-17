@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DiseaseHeader from './DiseaseHeader';
 import AddDiseaseModal from './AddDiseaseModal';
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
 
@@ -27,7 +27,41 @@ const DiseaseManagement = () => {
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [viewDisease, setViewDisease] = useState(null);
 
+  // current user for audit logs 
+  const [currentUser, setCurrentUser] = useState({
+    id: 'default_user',
+    fullname: 'System User',
+    username: 'system',
+    email: 'system@example.com'
+  });
+
   const itemsPerPage = 50;
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const adminToken = localStorage.getItem("admin_token");
+        const sessionId = localStorage.getItem("session_id");
+        if (adminToken && sessionId) {
+          const userDoc = await getDoc(doc(db, "accounts", adminToken));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.currentSession === sessionId) {
+              setCurrentUser({
+                id: userData.id || adminToken,
+                fullname: userData.fullname || 'Unknown User',
+                username: userData.username || 'unknown',
+                email: userData.email || 'unknown@example.com'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -74,12 +108,52 @@ const DiseaseManagement = () => {
       };
 
       if (id) {
+        // capture previous state for audit
+        const prevSnap = await getDoc(doc(db, "rice_local_diseases", id));
+        const before = prevSnap.exists() ? { id, ...prevSnap.data() } : null;
+
         dataToSave.updatedAt = new Date();
         await updateDoc(doc(db, "rice_local_diseases", id), dataToSave);
+
+        // audit log: UPDATE
+        await addDoc(collection(db, "audit_logs"), {
+          userId: currentUser.id,
+          userName: currentUser.fullname,
+          userEmail: currentUser.email,
+          timestamp: new Date(),
+          action: 'UPDATE',
+          collection: 'rice_local_diseases',
+          documentId: id,
+          documentName: dataToSave.name || 'Unnamed Disease',
+          description: 'Updated disease record',
+          changes: {
+            before,
+            after: { id, ...dataToSave }
+          }
+        });
+
         setSaveAction('updated');
       } else {
         dataToSave.createdAt = new Date();
-        await addDoc(collection(db, "rice_local_diseases"), dataToSave);
+        const docRef = await addDoc(collection(db, "rice_local_diseases"), dataToSave);
+
+        // audit log: CREATE
+        await addDoc(collection(db, "audit_logs"), {
+          userId: currentUser.id,
+          userName: currentUser.fullname,
+          userEmail: currentUser.email,
+          timestamp: new Date(),
+          action: 'CREATE',
+          collection: 'rice_local_diseases',
+          documentId: docRef.id,
+          documentName: dataToSave.name || 'Unnamed Disease',
+          description: 'Added new disease record',
+          changes: {
+            before: null,
+            after: { id: docRef.id, ...dataToSave }
+          }
+        });
+
         setSaveAction('added');
       }
 
@@ -101,7 +175,32 @@ const DiseaseManagement = () => {
   const performDelete = async (id) => {
     try {
       setSuccessDelete(true);
+
+      // capture full doc for audit before deleting
+      const before = diseases.find(d => d.id === id) || (await (async () => {
+        const snap = await getDoc(doc(db, "rice_local_diseases", id));
+        return snap.exists() ? { id, ...snap.data() } : null;
+      })());
+
       await deleteDoc(doc(db, "rice_local_diseases", id));
+
+      // audit log: DELETE
+      await addDoc(collection(db, "audit_logs"), {
+        userId: currentUser.id,
+        userName: currentUser.fullname,
+        userEmail: currentUser.email,
+        timestamp: new Date(),
+        action: 'DELETE',
+        collection: 'rice_local_diseases',
+        documentId: id,
+        documentName: before?.name || 'Unnamed Disease',
+        description: 'Deleted disease record',
+        changes: {
+          before,
+          after: null
+        }
+      });
+
       setTimeout(() => setSuccessDelete(false), 2000);
     } catch (err) {
       setSuccessDelete(false);
