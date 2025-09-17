@@ -18,7 +18,7 @@ const History = () => {
   const [nowTick, setNowTick] = useState(Date.now());
 
   // Actions that should be visible only to system admins
-  const hiddenForRegular = useMemo(() => new Set(['LOGIN_BLOCKED', 'RESTRICT', 'UNRESTRICT']), []);
+  const hiddenForRegular = useMemo(() => new Set(['LOGIN', 'RESTRICT', 'UNRESTRICT']), []);
 
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30000);
@@ -164,7 +164,7 @@ const History = () => {
       case 'REMOVED':
         return <Trash2 className="w-4 h-4 text-red-600" />;
       case 'RESTRICT':
-      case 'LOGIN_BLOCKED':
+      case 'LOGIN':
         return <Lock className="w-4 h-4 text-amber-600" />;
       case 'UNRESTRICT':
         return <Unlock className="w-4 h-4 text-emerald-600" />;
@@ -192,7 +192,7 @@ const History = () => {
       case 'REMOVED':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'RESTRICT':
-      case 'LOGIN_BLOCKED':
+      case 'LOGIN':
         return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'UNRESTRICT':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';

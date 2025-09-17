@@ -21,25 +21,43 @@ const Header = ({ setIsSidebarOpen }) => {
   const buttonRef = useRef(null);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const userId = localStorage.getItem('admin_token');
-        if (userId) {
-          const userDoc = await getDoc(doc(db, 'accounts', userId));
+  let isCancelled = false;
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const fetchUserData = async () => {
+    try {
+      // Hintayin lumabas ang token (up to 5s) habang naglo-login
+      const start = Date.now();
+      let userId = localStorage.getItem('admin_token');
+      while (!userId && Date.now() - start < 5000 && !isCancelled) {
+        await sleep(500);
+        userId = localStorage.getItem('admin_token');
+      }
+
+      if (isCancelled) return;
+
+      if (userId) {
+        const userDoc = await getDoc(doc(db, 'accounts', userId));
+        if (!isCancelled) {
           if (userDoc.exists()) {
             setUserData({ id: userId, ...userDoc.data() });
           } else {
             setUserData(null);
           }
-        } else {
-          setUserData(null);
         }
-      } finally {
-        setIsUserLoading(false);
+      } else {
+        setUserData(null);
       }
-    };
-    fetchUserData();
-  }, []);
+    } finally {
+      if (!isCancelled) setIsUserLoading(false);
+    }
+  };
+
+  fetchUserData();
+  return () => { isCancelled = true; };
+}, []);
+
 
   useEffect(() => {
     const handleClickOutside = (event) => {

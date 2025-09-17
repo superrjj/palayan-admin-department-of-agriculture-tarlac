@@ -57,25 +57,30 @@ const Sidebar = ({ onNavigate, isSidebarOpen, setIsSidebarOpen }) => {
           isSidebarCollapsed ? 'lg:w-16' : 'w-64'
         }`}
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-300">
-          {!isSidebarCollapsed && (
-            <div className="flex items-center space-x-7">
-              <img src="/ic_palayan_no_bg.png" alt="Logo" className="h-11 w-11 object-contain" />
-              <h1 className="text-xl font-bold text-green-700 flex items-center">PalaYan</h1>
-            </div>
-          )}
-          <div className="flex items-center space-x-2">
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-500 hover:text-gray-700">
-              <X className="h-6 w-6" />
-            </button>
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="hidden lg:block text-gray-500 hover:text-gray-700 p-1 rounded"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+        <div className="flex items-center justify-between px-4 py-6 border-b border-gray-300 relative">
+        {!isSidebarCollapsed && (
+          <div className="flex flex-col items-center justify-center w-full">
+            <img
+              src="/ic_palayan_no_bg.png"
+              alt="Logo"
+              className="h-[100px] w-[100px] object-contain mx-auto"
+            />
+            <h1 className="mt-2 text-xl font-bold text-green-700 text-center">PalaYan</h1>
           </div>
+        )}
+
+        <div className="flex items-center space-x-2 absolute top-3 right-3">
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-500 hover:text-gray-700">
+            <X className="h-6 w-6" />
+          </button>
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="hidden lg:block text-gray-500 hover:text-gray-700 p-1 rounded"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
         </div>
+      </div>
 
         <nav className="mt-8 px-2">
           {roleMenu.map((item) => {

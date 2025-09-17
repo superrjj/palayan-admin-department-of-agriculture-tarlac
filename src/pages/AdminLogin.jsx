@@ -109,11 +109,11 @@ export default function AdminLogin() {
               userName: candidate.fullname || candidate.username || 'Unknown',
               userEmail: candidate.email || '',
               timestamp: new Date(),
-              action: 'LOGIN_BLOCKED',
+              action: 'LOGIN',
               collection: 'accounts',
               documentId: candidate.id,
               documentName: candidate.fullname || candidate.username || 'Unknown',
-              description: 'Login blocked due to restricted/inactive/deleted status',
+              description: 'Login attempt blocked – account restricted',
               details: { status: candidate.status || null, isRestricted, isDeleted }
             });
           } catch {}
