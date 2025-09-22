@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, Info } from 'lucide-react';
+import { useRiceEnums } from '../../hooks/useRiceEnums';
 
 const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
+  const { seasons, plantingMethods, environments, yearReleases } = useRiceEnums();
+  const enumsLoading = !seasons.length && !plantingMethods.length && !environments.length && !yearReleases.length;
+
   const [form, setForm] = useState({
     varietyName: '',
     releaseName: '',
@@ -62,12 +66,6 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
       return changed ? next : prev;
     });
   }, [varietyData, currentRecordId, touched]);
-
-  const years = useMemo(() => {
-    const end = new Date().getFullYear();
-    const start = 2012;
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i).reverse();
-  }, []);
 
   const markTouched = (name) => setTouched((prev) => (prev[name] ? prev : { ...prev, [name]: true }));
 
@@ -203,10 +201,11 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                   value={form.yearRelease}
                   onChange={handleChange}
                   onBlur={() => markTouched('yearRelease')}
+                  disabled={enumsLoading}
                   className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr('yearRelease') ? 'border-red-400' : 'border-gray-300'}`}
                 >
-                  <option value="">Select Year</option>
-                  {years.map(y => (<option key={y} value={String(y)}>{y}</option>))}
+                  <option value="">{enumsLoading ? 'Loading…' : 'Select Year'}</option>
+                  {yearReleases.map(y => (<option key={y} value={String(y)}>{y}</option>))}
                 </select>
                 {showErr('yearRelease') && <span className="text-xs text-red-500 mt-1">{errors.yearRelease}</span>}
               </div>
@@ -283,11 +282,13 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                   value={form.plantingMethod}
                   onChange={handleChange}
                   onBlur={() => markTouched('plantingMethod')}
+                  disabled={enumsLoading}
                   className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr('plantingMethod') ? 'border-red-400' : 'border-gray-300'}`}
                 >
-                  <option value="">Select Method</option>
-                  <option value="Direct Seed">Direct Seed</option>
-                  <option value="Transplanting">Transplanting</option>
+                  <option value="">{enumsLoading ? 'Loading…' : 'Select Method'}</option>
+                  {plantingMethods.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
                 </select>
                 {showErr('plantingMethod') && <span className="text-xs text-red-500 mt-1">{errors.plantingMethod}</span>}
               </div>
@@ -297,7 +298,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700 mb-2">Season</label>
                 <div className="flex flex-wrap gap-4">
-                  {['Dry', 'Wet'].map(s => (
+                  {seasons.map(s => (
                     <label key={s} className="inline-flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -305,6 +306,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                         value={s}
                         checked={form.season.includes(s)}
                         onChange={handleChange}
+                        disabled={enumsLoading}
                       />
                       <span className="text-sm">{s}</span>
                     </label>
@@ -316,7 +318,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700 mb-2">Environment</label>
                 <div className="flex flex-wrap gap-4">
-                  {['Low Irrigated Land', 'Rainfed Lowland', 'Upperland'].map(env => (
+                  {environments.map(env => (
                     <label key={env} className="inline-flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -324,6 +326,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                         value={env}
                         checked={form.environment.includes(env)}
                         onChange={handleChange}
+                        disabled={enumsLoading}
                       />
                       <span className="text-sm">{env}</span>
                     </label>
@@ -333,16 +336,19 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="recommendedInTarlac"
-                checked={form.recommendedInTarlac}
-                onChange={handleChange}
-                id="recommendedInTarlac"
-              />
-              <label htmlFor="recommendedInTarlac" className="text-sm">Recommended in Tarlac</label>
-            </div>
+            <div className="flex items-center gap-2 h-10">
+            <input
+              type="checkbox"
+              id="recommendedInTarlac"
+              name="recommendedInTarlac"
+              checked={form.recommendedInTarlac}
+              onChange={handleChange}
+              className="w-4 h-4 shrink-0 accent-green-600 align-middle"
+            />
+            <label htmlFor="recommendedInTarlac" className="text-sm whitespace-nowrap select-none">
+              Recommended in Tarlac
+            </label>
+          </div>
           </section>
 
           {/* Actions */}
