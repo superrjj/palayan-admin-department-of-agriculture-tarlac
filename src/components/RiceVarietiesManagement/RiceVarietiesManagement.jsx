@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import RiceVarietyHeader from '../RiceVarietiesManagement/RiceVarietyHeader';
 import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';
@@ -19,7 +19,13 @@ const RiceVarietiesManagement = () => {
     username: 'system',
     email: 'system@example.com'
   });
-  const itemsPerPage = 50;
+  const itemsPerPage = 20;
+
+  // NEW: Confirm Delete Dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { id, varietyName }
+  const [confirmInput, setConfirmInput] = useState('');
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Get current user from localStorage and Firestore
   useEffect(() => {
@@ -81,9 +87,9 @@ const RiceVarietiesManagement = () => {
       (snapshot) => {
         console.log("Snapshot received, docs count:", snapshot.docs.length);
         
-        let data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+        let data = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
         }));
         
         // If we used the fallback query, filter out deleted items
@@ -211,53 +217,66 @@ const RiceVarietiesManagement = () => {
     setIsModalOpen(true);
   };
 
+  // Open confirm dialog instead of deleting immediately
   const handleDelete = async (id) => {
+    const target = varieties.find(v => v.id === id);
+    if (!target) return;
+    setConfirmTarget({ id, varietyName: target.varietyName || '' });
+    setConfirmInput('');
+    setConfirmOpen(true);
+  };
+
+  // Execute the existing soft delete after confirmation
+  const confirmDeleteNow = async () => {
+    if (!confirmTarget) return;
+    setConfirmBusy(true);
     try {
-      console.log("Deleting variety with ID:", id);
-      setSuccessDelete(true);
-
-      // Get the variety data before soft delete
+      const id = confirmTarget.id;
       const varietyToDelete = varieties.find(v => v.id === id);
-      console.log("Variety to delete:", varietyToDelete);
+      console.log("Deleting variety with ID:", id, "->", varietyToDelete);
 
-      setTimeout(async () => {
-        console.log("Current user when deleting:", currentUser);
-        
-        // Soft delete - update with isDeleted flag instead of actual delete
-        await updateDoc(doc(db, "rice_seed_varieties", id), {
-          isDeleted: true,
-          deletedAt: new Date(),
-          deletedBy: currentUser.id
-        });
-        
-        console.log("Variety soft deleted successfully");
-        
-        // Log the delete action
-        await addDoc(collection(db, "audit_logs"), {
-          userId: currentUser.id,
-          userName: currentUser.fullname,
-          userEmail: currentUser.email,
-          timestamp: new Date(),
-          action: 'DELETE',
-          collection: 'rice_seed_varieties',
-          documentId: id,
-          documentName: varietyToDelete?.varietyName || 'Unknown',
-          description: 'Deleted rice variety',
-          changes: {
-            before: varietyToDelete,
-            after: null
-          }
-        });
+      // Soft delete
+      await updateDoc(doc(db, "rice_seed_varieties", id), {
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: currentUser.id
+      });
+      
+      console.log("Variety soft deleted successfully");
+      
+      // Log the delete action
+      await addDoc(collection(db, "audit_logs"), {
+        userId: currentUser.id,
+        userName: currentUser.fullname,
+        userEmail: currentUser.email,
+        timestamp: new Date(),
+        action: 'DELETE',
+        collection: 'rice_seed_varieties',
+        documentId: id,
+        documentName: varietyToDelete?.varietyName || 'Unknown',
+        description: 'Deleted rice variety',
+        changes: {
+          before: varietyToDelete,
+          after: null
+        }
+      });
 
-        // Remove from local state
-        setVarieties((prev) => prev.filter((v) => v.id !== id));
-        setSuccessDelete(false);
-      }, 1000);
+      // Remove from local state
+      setVarieties((prev) => prev.filter((v) => v.id !== id));
+
+      // Close confirm dialog, show success animation
+      setConfirmBusy(false);
+      setConfirmOpen(false);
+      setSuccessDelete(true);
+      setTimeout(() => setSuccessDelete(false), 1200);
     } catch (error) {
       console.error("Failed to delete rice variety:", error);
       alert("Error deleting rice variety: " + error.message);
+      setConfirmBusy(false);
     }
   };
+
+  const canConfirmDelete = !!confirmTarget && confirmInput.trim() === (confirmTarget.varietyName || '').trim();
 
   return (
     <div className="p-4 lg:p-6">
@@ -286,6 +305,44 @@ const RiceVarietiesManagement = () => {
           onSave={handleAddOrEditVariety}
           varietyData={editVariety}
         />
+      )}
+
+      {/* Confirm Delete Dialog */}
+      {confirmOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-2 text-red-600">Confirm Delete</h3>
+            <p className="text-sm text-gray-700">
+              This action will remove the rice variety from the list. To confirm, type the variety name exactly:
+            </p>
+            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">
+              {confirmTarget?.varietyName || '(no name)'}
+            </div>
+            <input
+              className="mt-3 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+              placeholder="Type the variety name exactly to confirm"
+              value={confirmInput}
+              onChange={(e) => setConfirmInput(e.target.value)}
+              disabled={confirmBusy}
+            />
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => { if (!confirmBusy) setConfirmOpen(false); }}
+                className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60"
+                disabled={confirmBusy}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteNow}
+                disabled={!canConfirmDelete || confirmBusy}
+                className={`px-3 py-2 text-sm rounded-md text-white ${canConfirmDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'}`}
+              >
+                {confirmBusy ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Success Delete Animation */}

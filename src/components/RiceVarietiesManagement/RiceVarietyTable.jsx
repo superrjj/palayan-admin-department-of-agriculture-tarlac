@@ -1,7 +1,53 @@
 import React, { useState } from "react";
-import { Eye, X, Calendar, MapPin, BarChart2, Edit2, Trash2, Layers, Wheat } from "lucide-react";
+import {
+  Eye,
+  X,
+  Calendar,
+  MapPin,
+  BarChart2,
+  Edit2,
+  Trash2,
+  Layers,
+  Wheat,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
-const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, totalPages, setCurrentPage }) => {
+const YesNo = ({ v }) => (
+  <span
+    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+      v ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+    }`}
+    title={v ? "Recommended in Tarlac" : "Not recommended in Tarlac"}
+  >
+    {v ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+    {v ? "Yes" : "No"}
+  </span>
+);
+
+// Green pill styling for values (applies to all rows in the detail card)
+const DataPill = ({ value, suffix = "" }) => {
+  const has = value !== undefined && value !== null && String(value).trim() !== "";
+  return (
+    <span
+      className={`ml-2 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+        has ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+      }`}
+    >
+      {has ? `${Array.isArray(value) ? value.join(", ") : value}${suffix}` : "—"}
+    </span>
+  );
+};
+
+const RiceVarietyTable = ({
+  varieties,
+  loading,
+  onEdit,
+  onDelete,
+  currentPage,
+  totalPages,
+  setCurrentPage,
+}) => {
   const [selectedVariety, setSelectedVariety] = useState(null);
 
   return (
@@ -12,36 +58,41 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
           <table className="w-full">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Variety Name
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Release Name
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Breeding Code
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Year Release
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Location
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase">
+                {/* NEW: Recommended in Tarlac column */}
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Recommended in Tarlac
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                     Loading rice varieties...
                   </td>
                 </tr>
               ) : varieties.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
+                  <td colSpan="7" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <Wheat className="w-16 h-16 text-gray-300 mb-4" />
                       <p className="text-gray-500 text-lg">No rice variety found</p>
@@ -51,27 +102,36 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
               ) : (
                 varieties.map((variety) => (
                   <tr key={variety.id} className="hover:bg-gray-50 transition-all">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{variety.varietyName}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {variety.varietyName}
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.releaseName}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.breedingCode}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.yearRelease}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.location}</td>
+                    {/* NEW: Yes/No badge */}
+                    <td className="px-6 py-4 text-sm">
+                      <YesNo v={!!variety.recommendedInTarlac} />
+                    </td>
                     <td className="px-6 py-4 flex justify-center space-x-2">
                       <button
                         onClick={() => setSelectedVariety(variety)}
                         className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition"
+                        title="View"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onEdit(variety)}
                         className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
+                        title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => onDelete(variety.id)}
                         className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
+                        title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -107,13 +167,16 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
         )}
       </div>
 
-      {/* Creative Pop-up Card */}
+      {/* Pop-up Card */}
       {selectedVariety && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative animate-fadeIn">
             {/* Header */}
-            <div className="bg-gradient-to-r from-green-400 to-green-600 rounded-t-2xl p-6 flex justify-between items-center text-white">
-              <h2 className="text-2xl font-bold">{selectedVariety.varietyName}</h2>
+            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-2xl p-6 flex justify-between items-center text-white">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedVariety.varietyName}</h2>
+                <p className="text-sm text-white/90">{selectedVariety.releaseName}</p>
+              </div>
               <button
                 onClick={() => setSelectedVariety(null)}
                 className="p-2 hover:bg-white/20 rounded-full transition"
@@ -122,51 +185,113 @@ const RiceVarietyTable = ({ varieties, loading, onEdit, onDelete, currentPage, t
               </button>
             </div>
 
-            {/* Content with icons */}
+            {/* Content with icons (all values use green data pills) */}
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-green-600" />
-                <span><strong>Year Release:</strong> {selectedVariety.yearRelease}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Year Release:</span>
+                </span>
+                <DataPill value={selectedVariety.yearRelease} />
               </div>
+
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-green-600" />
-                <span><strong>Location:</strong> {selectedVariety.location}</span>
+                <span className="text-gray-700">
+                  <span  className="text-gray-800">Location:</span >
+                </span>
+                <DataPill value={selectedVariety.location} />
               </div>
+
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-5 h-5 text-green-600" />
-                <span><strong>Max Yield:</strong> {selectedVariety.maxYield}</span>
+                <span className="text-gray-700">
+                  <span  className="text-gray-800">Average Yield:</span>
+                </span>
+                <DataPill value={selectedVariety.averageYield} suffix=" t/ha" />
               </div>
+
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-green-600" />
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Max Yield:</span>
+                </span>
+                <DataPill value={selectedVariety.maxYield} suffix=" t/ha" />
+              </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Release Name:</strong> {selectedVariety.releaseName}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Breeding Code:</span>
+                </span>
+                <DataPill value={selectedVariety.breedingCode} />
               </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Breeding Code:</strong> {selectedVariety.breedingCode}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Maturity Days:</span>
+                </span>
+                <DataPill value={selectedVariety.maturityDays} />
               </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Maturity Days:</strong> {selectedVariety.maturityDays}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Plant Height:</span>
+                </span>
+                <DataPill value={selectedVariety.plantHeight} />
               </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Plant Height:</strong> {selectedVariety.plantHeight}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Tillers:</span>
+                </span>
+                <DataPill value={selectedVariety.tillers} />
               </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Tillers:</strong> {selectedVariety.tillers}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Season:</span>
+                </span>
+                <DataPill
+                  value={
+                    Array.isArray(selectedVariety.season)
+                      ? selectedVariety.season
+                      : selectedVariety.season || ""
+                  }
+                />
               </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Season:</strong> {selectedVariety.season}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Planting Method:</span>
+                </span>
+                <DataPill value={selectedVariety.plantingMethod} />
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 sm:col-span-2">
                 <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Planting Method:</strong> {selectedVariety.plantingMethod}</span>
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Environment:</span>
+                </span>
+                <DataPill
+                  value={
+                    Array.isArray(selectedVariety.environment)
+                      ? selectedVariety.environment
+                      : selectedVariety.environment || ""
+                  }
+                />
               </div>
+            </div>
+
+            <div className="px-6 pb-6">
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
-                <span><strong>Environment:</strong> {selectedVariety.environment}</span>
+                <span className="text-sm font-medium text-gray-600">Recommended in Tarlac:</span>
+                <YesNo v={!!selectedVariety.recommendedInTarlac} />
               </div>
             </div>
           </div>
