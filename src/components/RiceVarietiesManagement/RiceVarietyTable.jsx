@@ -10,7 +10,11 @@ import {
   Layers,
   Wheat,
   CheckCircle2,
+  Code,
   XCircle,
+  CalendarClock,
+  Split, 
+  Sprout, Crown, Ruler, Earth, Sun
 } from "lucide-react";
 
 const YesNo = ({ v }) => (
@@ -224,7 +228,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Code className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Breeding Code:</span>
                 </span>
@@ -233,7 +237,7 @@ const RiceVarietyTable = ({
 
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Crown className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Breeder Origin:</span>
                 </span>
@@ -241,7 +245,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <CalendarClock className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Maturity Days:</span>
                 </span>
@@ -249,7 +253,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Ruler className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Plant Height:</span>
                 </span>
@@ -257,7 +261,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Split className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Tillers:</span>
                 </span>
@@ -265,7 +269,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Sun className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Season:</span>
                 </span>
@@ -279,7 +283,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Sprout className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Planting Method:</span>
                 </span>
@@ -287,7 +291,7 @@ const RiceVarietyTable = ({
               </div>
 
               <div className="flex items-center gap-2 sm:col-span-2">
-                <Layers className="w-5 h-5 text-green-600" />
+                <Earth className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
                   <span className="text-gray-800">Environment:</span>
                 </span>
