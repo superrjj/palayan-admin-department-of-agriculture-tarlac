@@ -68,6 +68,9 @@ const RiceVarietyTable = ({
                   Breeding Code
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Breeder Origin
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
                   Year Release
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">
@@ -107,6 +110,7 @@ const RiceVarietyTable = ({
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.releaseName}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.breedingCode}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{variety.breederOrigin}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.yearRelease}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{variety.location}</td>
                     {/* NEW: Yes/No badge */}
@@ -227,6 +231,15 @@ const RiceVarietyTable = ({
                 <DataPill value={selectedVariety.breedingCode} />
               </div>
 
+
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-green-600" />
+                <span className="text-gray-700">
+                  <span className="text-gray-800">Breeder Origin:</span>
+                </span>
+                <DataPill value={selectedVariety.breederOrigin} />
+              </div>
+
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-green-600" />
                 <span className="text-gray-700">
@@ -289,7 +302,7 @@ const RiceVarietyTable = ({
             </div>
 
             <div className="px-6 pb-6">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-600">Recommended in Tarlac:</span>
                 <YesNo v={!!selectedVariety.recommendedInTarlac} />
               </div>

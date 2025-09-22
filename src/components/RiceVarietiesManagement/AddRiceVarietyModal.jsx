@@ -178,7 +178,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
             <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Identity</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { name: 'varietyName', label: 'Variety Name', ph: 'e.g., NSIC Rc 260' },
+                { name: 'varietyName', label: 'Variety Name', ph: 'e.g., NSIC Rc 160' },
                 { name: 'releaseName', label: 'Release Name', ph: 'e.g., ZINC 7' },
                 { name: 'breedingCode', label: 'Breeding Code', ph: 'e.g., IRRI12345' },
                 { name: 'breederOrigin', label: 'Breeder Origin', ph: 'e.g., PhilRice' }
@@ -271,7 +271,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                   value={form.location}
                   onChange={handleChange}
                   onBlur={() => markTouched('location')}
-                  placeholder="e.g., Pampanga"
+                  placeholder="e.g., Tarlac"
                   className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr('location') ? 'border-red-400' : 'border-gray-300'}`}
                 />
                 {showErr('location') && <span className="text-xs text-red-500 mt-1">{errors.location}</span>}
@@ -316,7 +316,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700 mb-2">Environment</label>
                 <div className="flex flex-wrap gap-4">
-                  {['Low Irrigated Land', 'Rainfed Lowland'].map(env => (
+                  {['Low Irrigated Land', 'Rainfed Lowland', 'Upperland'].map(env => (
                     <label key={env} className="inline-flex items-center gap-2">
                       <input
                         type="checkbox"
