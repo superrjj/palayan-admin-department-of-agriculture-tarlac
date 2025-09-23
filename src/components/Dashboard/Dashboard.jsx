@@ -169,7 +169,7 @@ const Dashboard = () => {
     });
 
     const sorted = opts.sortClient ? items.sort((a, b) => b._ts - a._ts) : items;
-    const limited = sorted.slice(0, 5);
+    const limited = sorted.slice(0, 4);
 
     if (limited.length === 0) {
       tryNextFieldOrResolveEmpty(uid, field);

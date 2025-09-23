@@ -27,6 +27,9 @@ const DiseaseManagement = () => {
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [viewDisease, setViewDisease] = useState(null);
 
+  // NEW: type-to-confirm input state
+  const [confirmText, setConfirmText] = useState('');
+
   // current user for audit logs 
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
@@ -210,6 +213,7 @@ const DiseaseManagement = () => {
 
   const openDeleteModal = (disease) => {
     setSelectedDisease({ id: disease.id, name: disease.name || 'Unnamed Disease' });
+    setConfirmText('');
     setShowDeleteModal(true);
   };
 
@@ -218,12 +222,16 @@ const DiseaseManagement = () => {
     await performDelete(selectedDisease.id);
     setShowDeleteModal(false);
     setSelectedDisease(null);
+    setConfirmText('');
   };
 
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setSelectedDisease(null);
+    setConfirmText('');
   };
+
+  const isConfirmMatch = (selectedDisease?.name || '') === confirmText;
 
   return (
     <div className="p-4 lg:p-6">
@@ -318,34 +326,58 @@ const DiseaseManagement = () => {
         />
       )}
 
-      {/* Delete Confirm Modal */}
+      {/* Delete Confirm Modal with type-to-confirm */}
       {showDeleteModal && selectedDisease && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <X className="w-8 h-8 text-red-600" />
+                <Trash className="w-8 h-8 text-red-600" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-800">Delete Disease</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Are you sure you want to delete <span className="font-medium">{selectedDisease.name}</span>? This action cannot be undone.
-                </p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    onClick={cancelDelete}
-                    className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm flex items-center gap-2"
-                  >
-                    <Trash className="w-4 h-4" />
-                    Delete
-                  </button>
-                </div>
+              <h3 className="mt-3 text-lg font-semibold text-gray-800">Delete Disease</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                This action cannot be undone. To confirm, type the disease name exactly:
+              </p>
+              <p className="mt-2 text-sm">
+                <span className="text-gray-500">Disease name:</span>{' '}
+                <span className="font-semibold text-gray-800">{selectedDisease.name}</span>
+              </p>
+
+              <div className="mt-3 w-full">
+                <input
+                  autoFocus
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && isConfirmMatch) confirmDelete();
+                  }}
+                  placeholder={`Type "${selectedDisease.name}" to confirm`}
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${
+                    isConfirmMatch ? 'border-red-300 focus:ring-red-400' : 'border-gray-300 focus:ring-gray-200'
+                  }`}
+                />
+                {!isConfirmMatch && confirmText.length > 0 && (
+                  <p className="mt-1 text-xs text-red-600">The text does not match the disease name.</p>
+                )}
+              </div>
+
+              <div className="mt-4 w-full flex justify-end gap-2">
+                <button
+                  onClick={cancelDelete}
+                  className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={!isConfirmMatch}
+                  className={`px-3 py-2 rounded-md text-white text-sm flex items-center gap-2 ${
+                    isConfirmMatch ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed opacity-70'
+                  }`}
+                >
+                  <Trash className="w-4 h-4" />
+                  Delete
+                </button>
               </div>
             </div>
           </div>

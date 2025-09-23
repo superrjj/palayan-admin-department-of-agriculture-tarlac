@@ -319,7 +319,7 @@ const RiceVarietiesManagement = () => {
               {confirmTarget?.varietyName || '(no name)'}
             </div>
             <input
-              className="mt-3 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+              className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
               placeholder="Type the variety name exactly to confirm"
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}

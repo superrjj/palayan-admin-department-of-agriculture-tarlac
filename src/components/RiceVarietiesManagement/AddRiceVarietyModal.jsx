@@ -189,7 +189,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                     onChange={handleChange}
                     onBlur={() => markTouched(f.name)}
                     placeholder={f.ph}
-                    className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
+                    className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
                   />
                   {showErr(f.name) && <span className="text-xs text-red-500 mt-1">{errors[f.name]}</span>}
                 </div>
@@ -202,7 +202,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                   onChange={handleChange}
                   onBlur={() => markTouched('yearRelease')}
                   disabled={enumsLoading}
-                  className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr('yearRelease') ? 'border-red-400' : 'border-gray-300'}`}
+                  className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm ${showErr('yearRelease') ? 'border-red-400' : 'border-gray-300'}`}
                 >
                   <option value="">{enumsLoading ? 'Loading…' : 'Select Year'}</option>
                   {yearReleases.map(y => (<option key={y} value={String(y)}>{y}</option>))}
@@ -229,7 +229,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                     onChange={handleChange}
                     onBlur={() => markTouched(f.name)}
                     placeholder={f.ph}
-                    className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
+                    className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
                   />
                   {showErr(f.name) && <span className="text-xs text-red-500 mt-1">{errors[f.name]}</span>}
                 </div>
@@ -251,7 +251,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                     onChange={handleChange}
                     onBlur={() => markTouched(f.name)}
                     placeholder={f.ph}
-                    className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
+                    className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm ${showErr(f.name) ? 'border-red-400' : 'border-gray-300'}`}
                   />
                   {showErr(f.name) && <span className="text-xs text-red-500 mt-1">{errors[f.name]}</span>}
                 </div>
