@@ -444,7 +444,7 @@ const AdminManagement = () => {
               {restrictTarget?.fullname || '(no full name)'}
             </div>
             <input
-              className="mt-3 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+              className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
               placeholder="Type the full name exactly to confirm"
               value={restrictInput}
               onChange={(e) => setRestrictInput(e.target.value)}
