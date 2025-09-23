@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PestHeader from './PestHeader';
 import AddPestModal from './AddPestModal';
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
 
@@ -18,13 +18,17 @@ const PestManagement = () => {
   // eslint-disable-next-line no-unused-vars
   const [successSave, setSuccessSave] = useState(false);
 
-  // eslint-disable-next-line no-unused-vars
   const [successDelete, setSuccessDelete] = useState(false);
 
   // eslint-disable-next-line no-unused-vars
   const [saveAction, setSaveAction] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedPest, setSelectedPest] = useState(null);
+
+  // NEW: Confirm Delete (type pest name)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { id, name }
+  const [confirmInput, setConfirmInput] = useState('');
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const [viewPest, setViewPest] = useState(null);
 
   // current user for audit logs (mirrors AdminManagement)
@@ -69,7 +73,7 @@ const PestManagement = () => {
       snapshot => {
         const data = snapshot.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(item => item.isDeleted !== true); // include missing or false
+          .filter(item => item.isDeleted !== true);
         setPests(data);
         setLoading(false);
       },
@@ -110,14 +114,12 @@ const PestManagement = () => {
       };
 
       if (id) {
-        // capture previous state for audit
         const prevSnap = await getDoc(doc(db, "rice_local_pests", id));
         const before = prevSnap.exists() ? { id, ...prevSnap.data() } : null;
 
         const next = { ...dataToSave, isDeleted: false, updatedAt: new Date() };
         await updateDoc(doc(db, "rice_local_pests", id), next);
 
-        // audit log: UPDATE
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -128,10 +130,7 @@ const PestManagement = () => {
           documentId: id,
           documentName: dataToSave.name || 'Unnamed Pest',
           description: 'Updated rice pest',
-          changes: {
-            before,
-            after: { id, ...next }
-          }
+          changes: { before, after: { id, ...next } }
         });
 
         setSaveAction('updated');
@@ -139,7 +138,6 @@ const PestManagement = () => {
         const next = { ...dataToSave, isDeleted: false, createdAt: new Date() };
         const docRef = await addDoc(collection(db, "rice_local_pests"), next);
 
-        // audit log: CREATE
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -150,10 +148,7 @@ const PestManagement = () => {
           documentId: docRef.id,
           documentName: dataToSave.name || 'Unnamed Pest',
           description: 'Added new rice pest',
-          changes: {
-            before: null,
-            after: { id: docRef.id, ...next }
-          }
+          changes: { before: null, after: { id: docRef.id, ...next } }
         });
 
         setSaveAction('added');
@@ -173,24 +168,31 @@ const PestManagement = () => {
     setIsModalOpen(true);
   };
 
-  const performDelete = async (id) => {
-    try {
-      setSuccessDelete(true);
+  // Open confirm dialog (type the pest name)
+  const openDeleteModal = (pest) => {
+    setConfirmTarget({ id: pest.id, name: pest.name || 'Unnamed Pest' });
+    setConfirmInput('');
+    setConfirmOpen(true);
+  };
 
-      // capture full doc for audit before soft delete
+  // Perform soft delete after confirmation
+  const confirmDeleteNow = async () => {
+    if (!confirmTarget) return;
+    setConfirmBusy(true);
+    try {
+      const id = confirmTarget.id;
+
       const before = pests.find(p => p.id === id) || (await (async () => {
         const snap = await getDoc(doc(db, "rice_local_pests", id));
         return snap.exists() ? { id, ...snap.data() } : null;
       })());
 
-      // soft delete
       await updateDoc(doc(db, "rice_local_pests", id), {
         isDeleted: true,
         deletedAt: new Date(),
         deletedBy: currentUser.id
       });
 
-      // audit log: DELETE
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
         userName: currentUser.fullname,
@@ -201,36 +203,31 @@ const PestManagement = () => {
         documentId: id,
         documentName: before?.name || 'Unnamed Pest',
         description: 'Deleted rice pest',
-        changes: {
-          before,
-          after: null
-        }
+        changes: { before, after: null }
       });
 
       setPests(prev => prev.filter(p => p.id !== id));
+
+      setConfirmBusy(false);
+      setConfirmOpen(false);
+      setConfirmTarget(null);
+      setConfirmInput('');
+      setSuccessDelete(true);
       setTimeout(() => setSuccessDelete(false), 1000);
     } catch (error) {
-      setSuccessDelete(false);
       alert("Error deleting rice pest: " + error.message);
+      setConfirmBusy(false);
     }
   };
 
-  const openDeleteModal = (pest) => {
-    setSelectedPest({ id: pest.id, name: pest.name || 'Unnamed Pest' });
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!selectedPest) return;
-    await performDelete(selectedPest.id);
-    setShowDeleteModal(false);
-    setSelectedPest(null);
-  };
-
   const cancelDelete = () => {
-    setShowDeleteModal(false);
-    setSelectedPest(null);
+    if (confirmBusy) return;
+    setConfirmOpen(false);
+    setConfirmTarget(null);
+    setConfirmInput('');
   };
+
+  const canConfirmDelete = !!confirmTarget && confirmInput.trim() === (confirmTarget.name || '').trim();
 
   return (
     <div className="p-4 lg:p-6">
@@ -321,34 +318,56 @@ const PestManagement = () => {
         />
       )}
 
-      {/* Delete Confirm Modal */}
-      {showDeleteModal && selectedPest && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+      {/* Confirm Delete Dialog - type the pest name, centered header with red circle X */}
+      {confirmOpen && confirmTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <X className="w-8 h-8 text-red-600" />
+                <Trash className="w-8 h-8 text-red-600" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-800">Delete Pest</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Are you sure you want to delete <span className="font-medium">{selectedPest.name}</span>? This action cannot be undone.
-                </p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    onClick={cancelDelete}
-                    className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm flex items-center gap-2"
-                  >
-                    <Trash className="w-4 h-4" />
-                    Delete
-                  </button>
-                </div>
+              <h3 className="mt-3 text-lg font-semibold text-gray-800">Delete Pest</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                This action cannot be undone. To confirm, type the pest name exactly:
+              </p>
+              <div className="mt-2 p-3 bg-gray-50 rounded border text-sm text-gray-800 w-full">
+                {confirmTarget.name}
+              </div>
+
+              <input
+                className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                placeholder="Type the pest name exactly to confirm"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && canConfirmDelete && !confirmBusy) confirmDeleteNow();
+                }}
+                disabled={confirmBusy}
+                autoFocus
+              />
+
+              {!canConfirmDelete && confirmInput.length > 0 && (
+                <div className="text-xs text-red-600 mt-1 w-full text-left">The text does not match.</div>
+              )}
+
+              <div className="mt-4 w-full flex justify-end gap-2">
+                <button
+                  onClick={cancelDelete}
+                  className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
+                  disabled={confirmBusy}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteNow}
+                  disabled={!canConfirmDelete || confirmBusy}
+                  className={`px-3 py-2 rounded-md text-white text-sm flex items-center gap-2 ${
+                    canConfirmDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Trash className="w-4 h-4" />
+                  {confirmBusy ? 'Deleting...' : 'Delete'}
+                </button>
               </div>
             </div>
           </div>
@@ -427,6 +446,17 @@ const PestManagement = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {successDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
+            <svg className="w-16 h-16 text-green-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <h3 className="text-base font-semibold text-green-600">Pest deleted successfully.</h3>
           </div>
         </div>
       )}
