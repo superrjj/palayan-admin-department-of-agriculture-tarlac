@@ -6,6 +6,9 @@ import AddAdminModal from '../AdminManagement/AddAdminModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const INACTIVE_AFTER_DAYS = 8; // whole-day buffer to avoid TZ edge cases
+
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,25 +106,34 @@ const AdminManagement = () => {
     }
   };
 
+  // Auto-inactivate ONLY (never toggles isRestricted)
   const checkInactiveAdmins = useCallback(async () => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const now = Date.now();
 
-    admins.forEach(async (admin) => {
-      if (!admin.lastLogin) return; 
-      const lastLogin = admin.lastLogin.seconds 
-        ? new Date(admin.lastLogin.seconds * 1000) 
-        : new Date(admin.lastLogin);
-      if (lastLogin < oneWeekAgo && admin.status !== "inactive") {
+    for (const admin of admins) {
+      const lastLoginMs = admin?.lastLogin?.seconds
+        ? admin.lastLogin.seconds * 1000
+        : (admin?.lastLogin ? new Date(admin.lastLogin).getTime() : NaN);
+      if (!Number.isFinite(lastLoginMs)) continue;
+
+      const idleDays = Math.floor((now - lastLoginMs) / MS_IN_DAY);
+
+      // Do not touch manually restricted users
+      if (admin.isRestricted === true) continue;
+
+      // Only flip active -> inactive after threshold
+      if (idleDays >= INACTIVE_AFTER_DAYS && admin.status === 'active') {
         try {
           await updateDoc(doc(db, "accounts", admin.id), {
-            status: "inactive"
+            status: "inactive",
+            autoInactive: true,
+            autoInactiveAt: new Date()
           });
         } catch (error) {
-          console.error(`Failed to update status for ${admin.username}:`, error);
+          console.error(`Failed to auto-inactivate ${admin.username}:`, error);
         }
       }
-    });
+    }
   }, [admins]);
 
   useEffect(() => {
@@ -279,7 +291,7 @@ const AdminManagement = () => {
       return;
     }
 
-    // Unrestrict path: proceed immediately (same as before)
+    // Unrestrict path: proceed immediately
     try {
       const prev = admins.find(a => a.id === id) || targetRow;
       const updateData = {
@@ -299,7 +311,7 @@ const AdminManagement = () => {
         documentId: id,
         documentName: prev?.fullname || prev?.username || 'Unknown',
         description: 'Unrestricted admin account',
-        changes: { before: { status: prev?.status }, after: { status: updateData.status } }
+        changes: { before: { status: prev?.status, isRestricted: prev?.isRestricted }, after: updateData }
       });
     } catch (e) {
       console.error('Failed to toggle restriction:', e);
@@ -307,7 +319,7 @@ const AdminManagement = () => {
     }
   };
 
-  // Execute restrict after confirmation
+  // Execute restrict after confirmation (sets isRestricted only + status inactive)
   const confirmRestrictNow = async () => {
     if (!restrictTarget) return;
     setRestrictBusy(true);
@@ -332,7 +344,7 @@ const AdminManagement = () => {
         documentId: id,
         documentName: prev?.fullname || prev?.username || 'Unknown',
         description: 'Restricted admin account',
-        changes: { before: { status: prev?.status }, after: { status: updateData.status } }
+        changes: { before: { status: prev?.status, isRestricted: prev?.isRestricted }, after: updateData }
       });
 
       setRestrictBusy(false);
@@ -368,6 +380,10 @@ const AdminManagement = () => {
         itemsPerPage={itemsPerPage}
         filteredAdmins={filteredAdmins}
         currentUserId={currentUser.id}
+        /* Tip in AdminTable:
+           const isRestrictedUI = row.isRestricted === true;
+           const isInactiveUI = row.status === 'inactive' && row.isRestricted !== true;
+        */
       />
 
       {isModalOpen && (
@@ -428,7 +444,7 @@ const AdminManagement = () => {
               {restrictTarget?.fullname || '(no full name)'}
             </div>
             <input
-              className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+              className="mt-3 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
               placeholder="Type the full name exactly to confirm"
               value={restrictInput}
               onChange={(e) => setRestrictInput(e.target.value)}
