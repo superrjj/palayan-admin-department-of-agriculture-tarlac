@@ -324,7 +324,7 @@ const FileMaintenance = () => {
 
           <div className="mt-4 bg-white rounded-lg shadow p-6">
             <p className="text-sm text-gray-600">
-              Placeholder for {titles[activeModule]} maintenance. Sabihin mo lang kung anong enums/fields ang gusto mo rito, ilalagay natin katulad ng Rice Variety.
+              Placeholder for {titles[activeModule]} maintenance. Wala pang code.
             </p>
           </div>
         </>
