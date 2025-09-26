@@ -33,6 +33,14 @@ export default function AdminLogin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fpError, setFpError] = useState('');
 
+  const securityQuestions = [
+    "What is your mother's maiden name?",
+    "What is the name of your first pet?",
+    "What is your favorite teacher’s name?",
+    "What city were you born in?",
+    "What was your first school?",
+  ];
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -40,9 +48,9 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (fpStep === 1 && fpUsername.trim() !== '') setFpError('');
-    if (fpStep === 2 && answer.trim() !== '') setFpError('');
+    if (fpStep === 2 && answer.trim() !== '' && selectedQuestion) setFpError('');
     if (fpStep === 3 && newPassword !== '' && confirmPassword !== '') setFpError('');
-  }, [fpUsername, answer, newPassword, confirmPassword, fpStep]);
+  }, [fpUsername, answer, newPassword, confirmPassword, selectedQuestion, fpStep]);
 
   const validateForm = () => {
     const next = {};
@@ -67,7 +75,6 @@ export default function AdminLogin() {
     try {
       const users = await fetchUsers();
 
-      // Find candidate by username or email
       const candidate = users.find(
         u => u.username === formData.username || u.email === formData.username
       );
@@ -87,7 +94,6 @@ export default function AdminLogin() {
       }
 
       if (candidate && isValid) {
-        // Block restricted/inactive/deleted accounts
         const status = String(candidate.status || '').toLowerCase();
         const isRestricted = candidate.isRestricted === true;
         const isDeleted = candidate.isDeleted === true;
@@ -102,7 +108,6 @@ export default function AdminLogin() {
           setShowRestricted(true);
           setIsLoading(false);
 
-          // optional audit
           try {
             await addDoc(collection(db, "audit_logs"), {
               userId: candidate.id,
@@ -121,7 +126,6 @@ export default function AdminLogin() {
           return;
         }
 
-        // Single-session set
         const sessionId = uuidv4();
         try {
           await updateDoc(doc(db, "accounts", candidate.id), { 
@@ -161,7 +165,8 @@ export default function AdminLogin() {
       const users = await fetchUsers();
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
-      setSecurityQuestion(user.securityQuestion);
+      setSecurityQuestion(user.securityQuestion || '');
+      setSelectedQuestion(''); // allow re-selection from full list
       setFpStep(2);
     } catch {
       setFpError('Something went wrong');
@@ -169,13 +174,24 @@ export default function AdminLogin() {
   };
 
   const handleFpNextAnswer = async () => {
+    if (!selectedQuestion) return setFpError("Please select your security question");
     if (!answer.trim()) return setFpError("Please enter your answer");
+
+    // Require the user to pick the SAME question saved on the account
+    if (selectedQuestion !== securityQuestion) {
+      return setFpError("Selected question does not match the one on your account");
+    }
+
     setFpError('');
     try {
       const users = await fetchUsers();
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
-      if ((user.securityAnswer || '').toLowerCase() !== answer.toLowerCase()) return setFpError('Wrong answer');
+
+      if ((user.securityAnswer || '').toLowerCase() !== answer.toLowerCase()) {
+        return setFpError('Wrong answer');
+      }
+
       setFpStep(3);
     } catch {
       setFpError('Something went wrong');
@@ -326,7 +342,6 @@ export default function AdminLogin() {
         </div>
       </div>
 
-      {/* Restricted dialog */}
       {showRestricted && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
@@ -347,7 +362,6 @@ export default function AdminLogin() {
         </div>
       )}
 
-      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 transition-opacity animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-96 shadow-2xl transform transition-all duration-300">
@@ -376,11 +390,14 @@ export default function AdminLogin() {
               <div className="space-y-3">
                 <label className="block font-medium">Security Question</label>
                 <select
-                  value={selectedQuestion || securityQuestion}
+                  value={selectedQuestion}
                   onChange={(e) => setSelectedQuestion(e.target.value)}
                   className="w-full border p-2 rounded focus:ring-2 focus:outline-none focus:ring-green-300 transition-all"
                 >
-                  <option value={securityQuestion}>{securityQuestion}</option>
+                  <option value="">-- Select your security question --</option>
+                  {securityQuestions.map((q, i) => (
+                    <option key={i} value={q}>{q}</option>
+                  ))}
                 </select>
                 <input
                   type="text"
@@ -421,7 +438,7 @@ export default function AdminLogin() {
                     { rule: "length", label: "At least 8 characters", passed: newPassword.length >= 8 },
                     { rule: "uppercase", label: "One uppercase letter", passed: /[A-Z]/.test(newPassword) },
                     { rule: "number", label: "One number", passed: /[0-9]/.test(newPassword) },
-                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?\":{}|<>]/.test(newPassword) },
+                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword) },
                   ].map(({ rule, label, passed }) => (
                     <div key={rule} className="flex items-center gap-1">
                       {passed ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-400" />}

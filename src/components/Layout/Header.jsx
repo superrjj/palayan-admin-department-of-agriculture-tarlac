@@ -21,43 +21,41 @@ const Header = ({ setIsSidebarOpen }) => {
   const buttonRef = useRef(null);
 
   useEffect(() => {
-  let isCancelled = false;
+    let isCancelled = false;
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const fetchUserData = async () => {
-    try {
-      // Hintayin lumabas ang token (up to 5s) habang naglo-login
-      const start = Date.now();
-      let userId = localStorage.getItem('admin_token');
-      while (!userId && Date.now() - start < 5000 && !isCancelled) {
-        await sleep(500);
-        userId = localStorage.getItem('admin_token');
-      }
-
-      if (isCancelled) return;
-
-      if (userId) {
-        const userDoc = await getDoc(doc(db, 'accounts', userId));
-        if (!isCancelled) {
-          if (userDoc.exists()) {
-            setUserData({ id: userId, ...userDoc.data() });
-          } else {
-            setUserData(null);
-          }
+    const fetchUserData = async () => {
+      try {
+        const start = Date.now();
+        let userId = localStorage.getItem('admin_token');
+        while (!userId && Date.now() - start < 5000 && !isCancelled) {
+          await sleep(500);
+          userId = localStorage.getItem('admin_token');
         }
-      } else {
-        setUserData(null);
+
+        if (isCancelled) return;
+
+        if (userId) {
+          const userDoc = await getDoc(doc(db, 'accounts', userId));
+          if (!isCancelled) {
+            if (userDoc.exists()) {
+              setUserData({ id: userId, ...userDoc.data() });
+            } else {
+              setUserData(null);
+            }
+          }
+        } else {
+          setUserData(null);
+        }
+      } finally {
+        if (!isCancelled) setIsUserLoading(false);
       }
-    } finally {
-      if (!isCancelled) setIsUserLoading(false);
-    }
-  };
+    };
 
-  fetchUserData();
-  return () => { isCancelled = true; };
-}, []);
-
+    fetchUserData();
+    return () => { isCancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -275,9 +273,20 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
   const [error, setError] = useState('');
   const overlayRef = useRef(null);
 
+  // Security questions state (user-managed here)
+  const securityQuestions = [
+    "What is your mother's maiden name?",
+    "What is the name of your first pet?",
+    "What is your favorite teacher’s name?",
+    "What city were you born in?",
+    "What was your first school?",
+  ];
+  const [securityQuestion, setSecurityQuestion] = useState(initialData.securityQuestion || '');
+  const [securityAnswer, setSecurityAnswer] = useState(initialData.securityAnswer || '');
+
   // Cropper state
   const [showCropper, setShowCropper] = useState(false);
-  const [cropSrc, setCropSrc] = useState(''); // raw selected image (data URL)
+  const [cropSrc, setCropSrc] = useState('');
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -350,7 +359,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
       cropPixels.width,
       cropPixels.height
     );
-    // Keep preview reasonable size; JPEG reduces memory usage
     return canvas.toDataURL('image/jpeg', 0.9);
   };
 
@@ -373,6 +381,13 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
       const userId = localStorage.getItem('admin_token');
       if (!userId) throw new Error('No user id');
 
+      // If user selects a question, require answer
+      if (securityQuestion && !securityAnswer.trim()) {
+        setSaving(false);
+        setError('Please provide an answer to your selected security question.');
+        return;
+      }
+
       if (email && email !== initialData.email) {
         try {
           const auth = getAuth();
@@ -388,9 +403,10 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
         fullname: fullname.trim(),
         email: email.trim(),
         contactNo: contact.trim(),
+        securityQuestion: securityQuestion || '',
+        securityAnswer: securityAnswer || '',
       };
 
-      // If there's a new/updated preview, upload to Storage and store only the download URL
       if (photoPreview && (photoFile || !initialData.photoURL || photoPreview !== initialData.photoURL)) {
         const blob = await compressDataUrlToBlob(photoPreview, 512, 0.85);
         const storage = getStorage();
@@ -449,7 +465,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
             <section className="mb-6">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Personal Info</h4>
 
-              {/* Centered, larger avatar */}
               <div className="flex flex-col items-center justify-center gap-4 mb-5">
                 <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ring-2 ring-gray-200">
                   {photoPreview ? (
@@ -523,6 +538,39 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
               </div>
             </section>
 
+            <section className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Security Question</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Select a question</label>
+                  <select
+                    value={securityQuestion}
+                    onChange={(e) => setSecurityQuestion(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                  >
+                    <option value="">-- Select a question --</option>
+                    {securityQuestions.map((q, i) => (
+                      <option key={i} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Your answer</label>
+                  <input
+                    type="text"
+                    value={securityAnswer}
+                    onChange={(e) => setSecurityAnswer(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    placeholder="Enter your answer"
+                    disabled={!securityQuestion}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                This question will be used to verify your identity if you forget your password.
+              </p>
+            </section>
+
             <section className="mb-2">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Change Password / Update Email</h4>
               <div className="flex flex-wrap gap-3">
@@ -566,7 +614,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
         </div>
       </div>
 
-      {/* Cropper dialog (centered, does not override, scroll-safe) */}
       {showCropper && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">

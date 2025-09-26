@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import bcrypt from 'bcryptjs';
-import { X, CheckCircle, XCircle, Lock, Mail, User, Shield, HelpCircle } from "lucide-react";
+import { X, CheckCircle, XCircle, Lock, Mail, User, Shield } from "lucide-react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/config"; // adjust path if needed
 
@@ -10,8 +10,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     email: adminData?.email || "",
     username: adminData?.username || "",
     password: adminData?.password || "",
-    securityQuestion: adminData?.securityQuestion || "",
-    securityAnswer: adminData?.securityAnswer || "",
     role: adminData?.role || "ADMIN",
   });
 
@@ -39,7 +37,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
       try {
         const qUser = query(collection(db, "accounts"), where("username", "==", value));
         const snap = await getDocs(qUser);
-        // block reuse even if isDeleted === true
         const conflict = snap.docs.find(d => d.id !== (adminData?.id || ""));
         if (!cancelled) {
           if (conflict) {
@@ -59,7 +56,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     };
   }, [formData.username, adminData?.id]);
 
-  // Email uniqueness (case-insensitive) and format check; block reuse even if deleted
   useEffect(() => {
     let cancelled = false;
     const raw = (formData.email || "").trim();
@@ -69,7 +65,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
       setEmailStatus({ checking: false, ok: false, msg: "" });
       return;
     }
-    // basic RFC5322-lite check
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
     if (!emailOk) {
       setEmailStatus({ checking: false, ok: false, msg: "Enter a valid email address" });
@@ -79,17 +74,14 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     setEmailStatus({ checking: true, ok: false, msg: "" });
     const t = setTimeout(async () => {
       try {
-        // prefer normalizedEmail if stored; also check email field for safety
         const q1 = query(collection(db, "accounts"), where("normalizedEmail", "==", value));
         const q2 = query(collection(db, "accounts"), where("email", "==", raw));
         const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
 
-        // merge doc ids
         const hits = new Map();
         s1.docs.forEach(d => { hits.set(d.id, d); });
         s2.docs.forEach(d => { hits.set(d.id, d); });
 
-        // conflict if any doc with different id exists (even if isDeleted true)
         const conflict = Array.from(hits.values()).find(d => d.id !== (adminData?.id || ""));
 
         if (!cancelled) {
@@ -153,14 +145,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
     setSuccess(true);
     setTimeout(() => setSuccess(false), 3000);
   };
-
-  const securityQuestions = [
-    "What is your mother's maiden name?",
-    "What is the name of your first pet?",
-    "What is your favorite teacher’s name?",
-    "What city were you born in?",
-    "What was your first school?",
-  ];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -267,39 +251,6 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
               ))}
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Security Question</label>
-            <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
-              <HelpCircle className="w-4 h-4 text-gray-400 mr-2" />
-              <select
-                name="securityQuestion"
-                value={formData.securityQuestion}
-                onChange={handleChange}
-                className="w-full p-2 outline-none bg-transparent"
-              >
-                <option value="">-- Select a question --</option>
-                {["What is your mother's maiden name?","What is the name of your first pet?","What is your favorite teacher’s name?","What city were you born in?","What was your first school?"].map((q, i) => (
-                  <option key={i} value={q}>{q}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {formData.securityQuestion && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Answer</label>
-              <input
-                type="text"
-                name="securityAnswer"
-                value={formData.securityAnswer}
-                onChange={handleChange}
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                placeholder="Enter your answer"
-                required
-              />
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
