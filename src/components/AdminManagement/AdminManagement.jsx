@@ -7,7 +7,7 @@ import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where, s
 import { db } from "../../firebase/config";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
-const INACTIVE_AFTER_DAYS = 8; // whole-day buffer to avoid TZ edge cases
+const INACTIVE_AFTER_DAYS = 8;
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]); 
@@ -26,24 +26,24 @@ const AdminManagement = () => {
   });
   const itemsPerPage = 20;
 
-  // Confirm Delete Dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmTarget, setConfirmTarget] = useState(null); // { id, fullname }
+  const [confirmTarget, setConfirmTarget] = useState(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  // Confirm Restrict Dialog state
   const [restrictOpen, setRestrictOpen] = useState(false);
-  const [restrictTarget, setRestrictTarget] = useState(null); // { id, fullname, prev }
+  const [restrictTarget, setRestrictTarget] = useState(null);
   const [restrictInput, setRestrictInput] = useState('');
   const [restrictBusy, setRestrictBusy] = useState(false);
+
+  // userId -> true if has activity logs
+  const [activityByUserId, setActivityByUserId] = useState({});
 
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
         const adminToken = localStorage.getItem("admin_token");
         const sessionId = localStorage.getItem("session_id");
-        
         if (adminToken && sessionId) {
           const userDoc = await getDoc(doc(db, "accounts", adminToken));
           if (userDoc.exists()) {
@@ -66,22 +66,16 @@ const AdminManagement = () => {
   }, []);
 
   useEffect(() => {
-    let q;
+    let qRef;
     try {
-      q = query(
-        collection(db, "accounts"),
-        where("isDeleted", "==", false)
-      );
+      qRef = query(collection(db, "accounts"), where("isDeleted", "==", false));
     } catch {
-      q = collection(db, "accounts");
+      qRef = collection(db, "accounts");
     }
-    
-    const unsub = onSnapshot(q, 
+    const unsub = onSnapshot(
+      qRef,
       (snapshot) => {
-        let data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         data = data.filter(item => item.isDeleted !== true);
         setAdmins(data);
         setLoading(false);
@@ -91,37 +85,35 @@ const AdminManagement = () => {
         setLoading(false);
       }
     );
-    
     return () => unsub();
   }, []);
 
-  // eslint-disable-next-line no-unused-vars
-  const updateLastLogin = async (userId) => {
-    try {
-      await updateDoc(doc(db, "accounts", userId), {
-        lastLogin: new Date()
-      });
-    } catch (error) {
-      console.error("Error updating lastLogin:", error);
-    }
-  };
+  // Build activity map (any audit_log with userId)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "audit_logs"),
+      (snap) => {
+        const next = {};
+        snap.docs.forEach(d => {
+          const uid = d.data()?.userId;
+          if (uid) next[uid] = true;
+        });
+        setActivityByUserId(next);
+      },
+      (err) => console.error("Error listening to audit_logs:", err)
+    );
+    return () => unsub();
+  }, []);
 
-  // Auto-inactivate ONLY after inactivity (never toggles isRestricted, never sets status restricted)
   const checkInactiveAdmins = useCallback(async () => {
     const now = Date.now();
-
     for (const admin of admins) {
       const lastLoginMs = admin?.lastLogin?.seconds
         ? admin.lastLogin.seconds * 1000
         : (admin?.lastLogin ? new Date(admin.lastLogin).getTime() : NaN);
       if (!Number.isFinite(lastLoginMs)) continue;
-
       const idleDays = Math.floor((now - lastLoginMs) / MS_IN_DAY);
-
-      // Skip manually restricted users entirely
       if (admin.isRestricted === true || admin.status === 'restricted') continue;
-
-      // Only flip active -> inactive after threshold
       if (idleDays >= INACTIVE_AFTER_DAYS && admin.status === 'active') {
         try {
           await updateDoc(doc(db, "accounts", admin.id), {
@@ -151,20 +143,13 @@ const AdminManagement = () => {
   const paginatedAdmins = filteredAdmins.slice(startIndex, startIndex + itemsPerPage);
   const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
 
-  const handleAddNew = () => {
-    setEditAdmin(null);
-    setIsModalOpen(true);
-  };
+  const handleAddNew = () => { setEditAdmin(null); setIsModalOpen(true); };
 
   const handleAddOrEditAdmin = async (adminData, id) => {
     try {
       if (id) {
         const currentAdmin = admins.find(a => a.id === id);
-        const updateData = {
-          ...adminData,
-          isDeleted: false,
-          updatedAt: new Date(),
-        };
+        const updateData = { ...adminData, isDeleted: false, updatedAt: new Date() };
         await updateDoc(doc(db, "accounts", id), updateData);
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
@@ -176,10 +161,7 @@ const AdminManagement = () => {
           documentId: id,
           documentName: adminData.fullname || adminData.username || 'Unknown',
           description: 'Updated admin account',
-          changes: {
-            before: currentAdmin,
-            after: updateData
-          }
+          changes: { before: currentAdmin, after: updateData }
         });
       } else {
         const newAdminData = {
@@ -201,10 +183,7 @@ const AdminManagement = () => {
           documentId: docRef.id,
           documentName: adminData.fullname || adminData.username || 'Unknown',
           description: 'Added new admin account',
-          changes: {
-            before: null,
-            after: newAdminData
-          }
+          changes: { before: null, after: newAdminData }
         });
       }
       setIsModalOpen(false);
@@ -215,17 +194,11 @@ const AdminManagement = () => {
     }
   };
 
-  const handleEdit = (admin) => {
-    setEditAdmin(admin);
-    setIsModalOpen(true);
-  };
+  const handleEdit = (admin) => { setEditAdmin(admin); setIsModalOpen(true); };
 
-  // Open confirm dialog instead of deleting immediately
+  // Delete blocked for self or has activity; Restrict blocked only for self
   const handleDelete = async (id) => {
-    if (id === currentUser.id) {
-      alert('You cannot delete your own account.');
-      return;
-    }
+    if (id === currentUser.id || activityByUserId[id]) return;
     const target = admins.find(a => a.id === id);
     if (!target) return;
     setConfirmTarget({ id, fullname: target.fullname || '' });
@@ -233,20 +206,15 @@ const AdminManagement = () => {
     setConfirmOpen(true);
   };
 
-  // Execute the soft delete after confirmation
   const confirmDeleteNow = async () => {
     if (!confirmTarget) return;
     setConfirmBusy(true);
     try {
       const id = confirmTarget.id;
       const adminToDelete = admins.find(a => a.id === id);
+      if (id === currentUser.id || activityByUserId[id]) { setConfirmBusy(false); setConfirmOpen(false); return; }
 
-      await updateDoc(doc(db, "accounts", id), {
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedBy: currentUser.id
-      });
-
+      await updateDoc(doc(db, "accounts", id), { isDeleted: true, deletedAt: new Date(), deletedBy: currentUser.id });
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
         userName: currentUser.fullname,
@@ -257,33 +225,24 @@ const AdminManagement = () => {
         documentId: id,
         documentName: adminToDelete?.fullname || adminToDelete?.username || 'Unknown',
         description: 'Deleted admin account',
-        changes: {
-          before: adminToDelete,
-          after: null
-        }
+        changes: { before: adminToDelete, after: null }
       });
 
-      setAdmins((prev) => prev.filter((a) => a.id !== id));
-
+      setAdmins(prev => prev.filter(a => a.id !== id));
       setConfirmBusy(false);
       setConfirmOpen(false);
       setSuccessDelete(true);
       setTimeout(() => setSuccessDelete(false), 1200);
     } catch (error) {
       console.error("Failed to delete admin:", error);
-      alert("Error deleting admin: " + error.message);
       setConfirmBusy(false);
     }
   };
 
-  // Restrict/Unrestrict with confirm-typing when restricting
   const handleToggleRestriction = async (id, nextActive, targetRow) => {
-    if (id === currentUser.id) {
-      alert('You cannot restrict/unrestrict your own account.');
-      return;
-    }
+    // only block restricting yourself
+    if (id === currentUser.id && !nextActive) return;
 
-    // If restricting (nextActive === false), open confirm dialog
     if (!nextActive) {
       const prev = admins.find(a => a.id === id) || targetRow;
       setRestrictTarget({ id, fullname: prev?.fullname || '', prev });
@@ -292,15 +251,9 @@ const AdminManagement = () => {
       return;
     }
 
-    // Unrestrict path: proceed immediately (set status back to active)
     try {
       const prev = admins.find(a => a.id === id) || targetRow;
-      const updateData = {
-        status: 'active',
-        isRestricted: false,
-        restrictedAt: null,
-        updatedAt: new Date()
-      };
+      const updateData = { status: 'active', isRestricted: false, restrictedAt: null, updatedAt: new Date() };
       await updateDoc(doc(db, "accounts", id), updateData);
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
@@ -316,11 +269,9 @@ const AdminManagement = () => {
       });
     } catch (e) {
       console.error('Failed to toggle restriction:', e);
-      alert('Failed to update restriction: ' + (e.message || e));
     }
   };
 
-  // Execute restrict after confirmation (sets both: status='restricted' and isRestricted=true)
   const confirmRestrictNow = async () => {
     if (!restrictTarget) return;
     setRestrictBusy(true);
@@ -329,7 +280,7 @@ const AdminManagement = () => {
       const prev = restrictTarget.prev;
 
       const updateData = {
-        status: 'restricted',        // keep restricted distinct from inactive
+        status: 'restricted',
         isRestricted: true,
         restrictedAt: serverTimestamp(),
         updatedAt: new Date()
@@ -352,7 +303,6 @@ const AdminManagement = () => {
       setRestrictOpen(false);
     } catch (e) {
       console.error('Failed to restrict account:', e);
-      alert('Failed to restrict account: ' + (e.message || e));
       setRestrictBusy(false);
     }
   };
@@ -360,32 +310,22 @@ const AdminManagement = () => {
   const canConfirmDelete = !!confirmTarget && confirmInput.trim() === (confirmTarget.fullname || '').trim();
   const canConfirmRestrict = !!restrictTarget && restrictInput.trim() === (restrictTarget.fullname || '').trim();
 
+
   return (
     <div className="p-4 lg:p-6">
-      <AdminHeader
-        onAddNew={handleAddNew}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-      />
+      <AdminHeader onAddNew={handleAddNew} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
       <AdminTable
         admins={paginatedAdmins}
         loading={loading}
-        onEdit={handleEdit}
+        onEdit={(admin) => { setEditAdmin(admin); setIsModalOpen(true); }}
         onDelete={handleDelete}
         onToggleRestriction={handleToggleRestriction}
         currentPage={currentPage}
         totalPages={totalPages}
         setCurrentPage={setCurrentPage}
-        startIndex={startIndex}
-        itemsPerPage={itemsPerPage}
-        filteredAdmins={filteredAdmins}
         currentUserId={currentUser.id}
-        /* Tips for separate states in AdminTable rendering:
-           const isRestrictedUI = row.status === 'restricted' || row.isRestricted === true;
-           const isInactiveUI = row.status === 'inactive' && row.isRestricted !== true;
-           const isActiveUI = row.status === 'active' && row.isRestricted !== true;
-        */
+        activityByUserId={activityByUserId}
       />
 
       {isModalOpen && (
@@ -396,17 +336,12 @@ const AdminManagement = () => {
         />
       )}
 
-      {/* Confirm Delete Dialog */}
       {confirmOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w/full max-w-md p-6">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-2 text-red-600">Confirm Delete</h3>
-            <p className="text-sm text-gray-700">
-              This action will remove the admin account. To confirm, type the full name exactly:
-            </p>
-            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">
-              {confirmTarget?.fullname || '(no full name)'}
-            </div>
+            <p className="text-sm text-gray-700">This action will remove the admin account. To confirm, type the full name exactly:</p>
+            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">{confirmTarget?.fullname || '(no full name)'}</div>
             <input
               className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
               placeholder="Type the full name exactly to confirm"
@@ -415,18 +350,8 @@ const AdminManagement = () => {
               disabled={confirmBusy}
             />
             <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => { if (!confirmBusy) setConfirmOpen(false); }}
-                className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60"
-                disabled={confirmBusy}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteNow}
-                disabled={!canConfirmDelete || confirmBusy}
-                className={`px-3 py-2 text-sm rounded-md text-white ${canConfirmDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'}`}
-              >
+              <button onClick={() => { if (!confirmBusy) setConfirmOpen(false); }} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60" disabled={confirmBusy}>Cancel</button>
+              <button onClick={confirmDeleteNow} disabled={!canConfirmDelete || confirmBusy} className={`px-3 py-2 text-sm rounded-md text-white ${canConfirmDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'}`}>
                 {confirmBusy ? 'Deleting...' : 'Delete'}
               </button>
             </div>
@@ -434,17 +359,12 @@ const AdminManagement = () => {
         </div>
       )}
 
-      {/* Confirm Restrict Dialog */}
       {restrictOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w/full max-w-md p-6">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-2 text-amber-600">Confirm Restrict</h3>
-            <p className="text-sm text-gray-700">
-              Restricting will set the account status to restricted. To confirm, type the full name exactly:
-            </p>
-            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">
-              {restrictTarget?.fullname || '(no full name)'}
-            </div>
+            <p className="text-sm text-gray-700">Restricting will set the account status to restricted. To confirm, type the full name exactly:</p>
+            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">{restrictTarget?.fullname || '(no full name)'}</div>
             <input
               className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
               placeholder="Type the full name exactly to confirm"
@@ -453,18 +373,8 @@ const AdminManagement = () => {
               disabled={restrictBusy}
             />
             <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => { if (!restrictBusy) setRestrictOpen(false); }}
-                className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60"
-                disabled={restrictBusy}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRestrictNow}
-                disabled={!canConfirmRestrict || restrictBusy}
-                className={`px-3 py-2 text-sm rounded-md text-white ${canConfirmRestrict ? 'bg-amber-600 hover:bg-amber-700' : 'bg-amber-400 cursor-not-allowed'}`}
-              >
+              <button onClick={() => { if (!restrictBusy) setRestrictOpen(false); }} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60" disabled={restrictBusy}>Cancel</button>
+              <button onClick={confirmRestrictNow} disabled={!canConfirmRestrict || restrictBusy} className={`px-3 py-2 text-sm rounded-md text-white ${canConfirmRestrict ? 'bg-amber-600 hover:bg-amber-700' : 'bg-amber-400 cursor-not-allowed'}`}>
                 {restrictBusy ? 'Restricting...' : 'Restrict'}
               </button>
             </div>

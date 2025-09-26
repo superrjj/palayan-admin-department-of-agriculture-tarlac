@@ -7,11 +7,12 @@ const AdminTable = ({
   loading, 
   onEdit,   
   onDelete, 
-  onToggleRestriction, //void
+  onToggleRestriction,
   currentPage, 
   totalPages, 
   setCurrentPage,
-  currentUserId // ADDED
+  currentUserId,
+  activityByUserId // map: { [userId]: true } if has activities
 }) => {
 
   const getRoleIcon = (role) => role === 'super admin'
@@ -23,7 +24,6 @@ const AdminTable = ({
     const roleClasses = role === 'super admin' 
       ? "bg-violet-100 text-violet-800 border border-violet-200" 
       : "bg-blue-100 text-blue-800 border border-blue-200";
-    
     return (
       <span className={`${baseClasses} ${roleClasses}`}>
         {getRoleIcon(role)}
@@ -31,6 +31,9 @@ const AdminTable = ({
       </span>
     );
   };
+
+  // Only lower opacity when disabled; keep icon colors (amber/green/red)
+  const disabledBtn = 'opacity-40 cursor-not-allowed pointer-events-none';
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
@@ -51,9 +54,7 @@ const AdminTable = ({
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
-                  Loading admins...
-                </td>
+                <td colSpan="8" className="px-6 py-12 text-center text-gray-500">Loading admins...</td>
               </tr>
             ) : admins.length === 0 ? (
               <tr>
@@ -68,6 +69,11 @@ const AdminTable = ({
               admins.map((admin) => {
                 const isActive = (admin.status?.toLowerCase?.() === 'active') || admin.status === true;
                 const isSelf = admin.id === currentUserId;
+                const hasActivity = !!activityByUserId?.[admin.id];
+
+                // Delete disabled for self or has activities; Restrict disabled only for self
+                const isDeleteDisabled = isSelf || hasActivity;
+                const isRestrictDisabled = isSelf;
 
                 return (
                   <tr key={admin.id} className="hover:bg-gray-50 transition-all">
@@ -76,11 +82,7 @@ const AdminTable = ({
                     <td className="px-6 py-4 text-sm text-gray-600">{admin.username}</td>
                     <td className="px-6 py-4">{getRoleBadge(admin.role)}</td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full font-medium ${
-                          isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}
-                      >
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {isActive ? 'Active' : 'Restricted'}
                       </span>
                     </td>
@@ -101,20 +103,20 @@ const AdminTable = ({
                     <td className="px-6 py-4">
                       <div className="flex justify-center space-x-2">
                         <button
-                          onClick={() => !isSelf && onToggleRestriction?.(admin.id, !isActive, admin)}
-                          className={`p-2 rounded-lg transition ${isActive ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'} ${isSelf ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                          onClick={() => !isRestrictDisabled && onToggleRestriction?.(admin.id, !isActive, admin)}
+                          className={`p-2 rounded-lg transition ${isActive ? 'text-amber-600 hover:bg-amber-100' : 'text-green-600 hover:bg-green-100'} ${isRestrictDisabled ? disabledBtn : ''}`}
                           aria-label={isActive ? 'Restrict' : 'Unrestrict'}
-                          title={isSelf ? 'You cannot restrict your own account' : (isActive ? 'Restrict' : 'Unrestrict')}
-                          disabled={isSelf}
+                          title={isRestrictDisabled ? 'You cannot restrict your own account' : (isActive ? 'Restrict' : 'Unrestrict')}
+                          disabled={isRestrictDisabled}
                         >
                           {isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                         </button>
                         <button
-                          onClick={() => !isSelf && onDelete(admin.id)}
-                          className={`p-2 text-red-600 hover:bg-red-100 rounded-lg transition ${isSelf ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                          onClick={() => !isDeleteDisabled && onDelete(admin.id)}
+                          className={`p-2 text-red-600 hover:bg-red-100 rounded-lg transition ${isDeleteDisabled ? disabledBtn : ''}`}
                           aria-label="Delete"
-                          title={isSelf ? 'You cannot delete your own account' : 'Delete'}
-                          disabled={isSelf}
+                          title={isDeleteDisabled ? (isSelf ? 'You cannot delete your own account' : 'Cannot delete: account has activities') : 'Delete'}
+                          disabled={isDeleteDisabled}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -137,9 +139,7 @@ const AdminTable = ({
           >
             Previous
           </button>
-          <span className="text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
+          <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
           <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
