@@ -95,15 +95,14 @@ export default function AdminLogin() {
 
       if (candidate && isValid) {
         const status = String(candidate.status || '').toLowerCase();
-        const isRestricted = candidate.isRestricted === true;
         const isDeleted = candidate.isDeleted === true;
+        // Treat "restricted" strictly; do not block when status is "inactive"
+        const isRestricted = candidate.isRestricted === true || status === 'restricted';
 
-        if (isDeleted || isRestricted || (status && status !== 'active')) {
+        if (isDeleted || isRestricted) {
           const msg = isDeleted
             ? 'This account has been deleted.'
-            : isRestricted || status === 'inactive'
-            ? 'Your account is restricted. Please contact an administrator.'
-            : 'Your account is not active.';
+            : 'Your account is restricted. Please contact an administrator.';
           setRestrictedMsg(msg);
           setShowRestricted(true);
           setIsLoading(false);
@@ -118,14 +117,15 @@ export default function AdminLogin() {
               collection: 'accounts',
               documentId: candidate.id,
               documentName: candidate.fullname || candidate.username || 'Unknown',
-              description: 'Login attempt blocked – account restricted',
-              details: { status: candidate.status || null, isRestricted, isDeleted }
+              description: isDeleted ? 'Login attempt blocked – account deleted' : 'Login attempt blocked – account restricted',
+              details: { status: candidate.status || null, isRestricted: candidate.isRestricted === true, isDeleted }
             });
           } catch {}
 
           return;
         }
 
+        // Allow login for active and inactive. On successful login, set to active.
         const sessionId = uuidv4();
         try {
           await updateDoc(doc(db, "accounts", candidate.id), { 
@@ -177,7 +177,6 @@ export default function AdminLogin() {
     if (!selectedQuestion) return setFpError("Please select your security question");
     if (!answer.trim()) return setFpError("Please enter your answer");
 
-    // Require the user to pick the SAME question saved on the account
     if (selectedQuestion !== securityQuestion) {
       return setFpError("Selected question does not match the one on your account");
     }

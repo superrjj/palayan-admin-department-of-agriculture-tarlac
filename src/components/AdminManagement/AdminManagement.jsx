@@ -106,7 +106,7 @@ const AdminManagement = () => {
     }
   };
 
-  // Auto-inactivate ONLY (never toggles isRestricted)
+  // Auto-inactivate ONLY after inactivity (never toggles isRestricted, never sets status restricted)
   const checkInactiveAdmins = useCallback(async () => {
     const now = Date.now();
 
@@ -118,8 +118,8 @@ const AdminManagement = () => {
 
       const idleDays = Math.floor((now - lastLoginMs) / MS_IN_DAY);
 
-      // Do not touch manually restricted users
-      if (admin.isRestricted === true) continue;
+      // Skip manually restricted users entirely
+      if (admin.isRestricted === true || admin.status === 'restricted') continue;
 
       // Only flip active -> inactive after threshold
       if (idleDays >= INACTIVE_AFTER_DAYS && admin.status === 'active') {
@@ -188,6 +188,7 @@ const AdminManagement = () => {
           isDeleted: false,
           createdAt: new Date(),
           lastLogin: null,
+          isRestricted: false
         };
         const docRef = await addDoc(collection(db, "accounts"), newAdminData);
         await addDoc(collection(db, "audit_logs"), {
@@ -291,7 +292,7 @@ const AdminManagement = () => {
       return;
     }
 
-    // Unrestrict path: proceed immediately
+    // Unrestrict path: proceed immediately (set status back to active)
     try {
       const prev = admins.find(a => a.id === id) || targetRow;
       const updateData = {
@@ -319,7 +320,7 @@ const AdminManagement = () => {
     }
   };
 
-  // Execute restrict after confirmation (sets isRestricted only + status inactive)
+  // Execute restrict after confirmation (sets both: status='restricted' and isRestricted=true)
   const confirmRestrictNow = async () => {
     if (!restrictTarget) return;
     setRestrictBusy(true);
@@ -328,7 +329,7 @@ const AdminManagement = () => {
       const prev = restrictTarget.prev;
 
       const updateData = {
-        status: 'inactive',
+        status: 'restricted',        // keep restricted distinct from inactive
         isRestricted: true,
         restrictedAt: serverTimestamp(),
         updatedAt: new Date()
@@ -380,9 +381,10 @@ const AdminManagement = () => {
         itemsPerPage={itemsPerPage}
         filteredAdmins={filteredAdmins}
         currentUserId={currentUser.id}
-        /* Tip in AdminTable:
-           const isRestrictedUI = row.isRestricted === true;
+        /* Tips for separate states in AdminTable rendering:
+           const isRestrictedUI = row.status === 'restricted' || row.isRestricted === true;
            const isInactiveUI = row.status === 'inactive' && row.isRestricted !== true;
+           const isActiveUI = row.status === 'active' && row.isRestricted !== true;
         */
       />
 
@@ -397,7 +399,7 @@ const AdminManagement = () => {
       {/* Confirm Delete Dialog */}
       {confirmOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+          <div className="bg-white rounded-lg shadow-lg w/full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-2 text-red-600">Confirm Delete</h3>
             <p className="text-sm text-gray-700">
               This action will remove the admin account. To confirm, type the full name exactly:
@@ -435,10 +437,10 @@ const AdminManagement = () => {
       {/* Confirm Restrict Dialog */}
       {restrictOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+          <div className="bg-white rounded-lg shadow-lg w/full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-2 text-amber-600">Confirm Restrict</h3>
             <p className="text-sm text-gray-700">
-              Restricting will set the account to inactive. To confirm, type the full name exactly:
+              Restricting will set the account status to restricted. To confirm, type the full name exactly:
             </p>
             <div className="mt-3 p-3 bg-gray-50 rounded border text-sm text-gray-800">
               {restrictTarget?.fullname || '(no full name)'}
