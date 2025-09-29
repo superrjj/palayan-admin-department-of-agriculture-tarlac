@@ -1,7 +1,8 @@
+// src/components/AdminLogin.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUsers } from "../service/userService";
-import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { doc, updateDoc, addDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { User, Lock, Eye, EyeOff, LogOut, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
 import { v4 as uuidv4 } from "uuid";
@@ -37,17 +38,33 @@ export default function AdminLogin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fpError, setFpError] = useState('');
 
-  const securityQuestions = [
-    "What is your mother's maiden name?",
-    "What is the name of your first pet?",
-    "What is your favorite teacher’s name?",
-    "What city were you born in?",
-    "What was your first school?",
-  ];
+  // Dynamic security questions (from maintenance/accounts_enums)
+  const [securityQuestions, setSecurityQuestions] = useState([]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Subscribe to security questions list in Firestore
+  useEffect(() => {
+    const ref = doc(db, "maintenance", "accounts_enums");
+    const unsub = onSnapshot(ref, (snap) => {
+      const d = snap.data() || {};
+      const list = Array.isArray(d.securityQuestions) ? d.securityQuestions : [];
+      setSecurityQuestions(
+        list.length
+          ? list
+          : [
+              "What is your mother's maiden name?",
+              "What is the name of your first pet?",
+              "What is your favorite teacher’s name?",
+              "What city were you born in?",
+              "What was your first school?",
+            ]
+      );
+    });
+    return () => unsub();
   }, []);
 
   // Show auto-logout modal if dashboard set a reason
@@ -114,7 +131,6 @@ export default function AdminLogin() {
       if (candidate && isValid) {
         const status = String(candidate.status || '').toLowerCase();
         const isDeleted = candidate.isDeleted === true;
-        // Treat "restricted" strictly; do not block when status is "inactive"
         const isRestricted = candidate.isRestricted === true || status === 'restricted';
 
         if (isDeleted || isRestricted) {
@@ -184,7 +200,7 @@ export default function AdminLogin() {
       const user = users.find(u => u.username === fpUsername || u.email === fpUsername);
       if (!user) return setFpError('User not found');
       setSecurityQuestion(user.securityQuestion || '');
-      setSelectedQuestion(''); // allow re-selection from full list
+      setSelectedQuestion('');
       setFpStep(2);
     } catch {
       setFpError('Something went wrong');
@@ -194,7 +210,6 @@ export default function AdminLogin() {
   const handleFpNextAnswer = async () => {
     if (!selectedQuestion) return setFpError("Please select your security question");
     if (!answer.trim()) return setFpError("Please enter your answer");
-
     if (selectedQuestion !== securityQuestion) {
       return setFpError("Selected question does not match the one on your account");
     }
@@ -359,7 +374,6 @@ export default function AdminLogin() {
         </div>
       </div>
 
-      {/* Auto logout dialog */}
       {showAutoLogout && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
@@ -380,7 +394,6 @@ export default function AdminLogin() {
         </div>
       )}
 
-      {/* Restricted dialog */}
       {showRestricted && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
@@ -401,7 +414,6 @@ export default function AdminLogin() {
         </div>
       )}
 
-      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 transition-opacity animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-96 shadow-2xl transform transition-all duration-300">

@@ -6,6 +6,9 @@ import { Plus, Trash2, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-
 const ENUM_DOC_COLL = "maintenance";
 const ENUM_DOC_ID = "rice_varieties_enums";
 
+// Accounts enums doc (new) for security questions
+const ACCOUNTS_ENUM_DOC_ID = "accounts_enums";
+
 const FileMaintenance = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +36,13 @@ const FileMaintenance = () => {
 
   // NEW: selector state
   const [activeModule, setActiveModule] = useState(null); // 'variety' | 'pest' | 'disease' | 'accounts' | null
+
+  // Accounts: security questions state
+  const [accLoading, setAccLoading] = useState(false);
+  const [securityQuestions, setSecurityQuestions] = useState([]);
+  const [sqInput, setSqInput] = useState("");
+  const [confirmOpenAcc, setConfirmOpenAcc] = useState(false);
+  const [confirmTargetAcc, setConfirmTargetAcc] = useState(null); // {value}
 
   useEffect(() => {
     const ref = doc(db, ENUM_DOC_COLL, ENUM_DOC_ID);
@@ -85,6 +95,56 @@ const FileMaintenance = () => {
     initAndListen().then((u) => (unsubFn = u));
     return () => unsubFn && unsubFn();
   }, []);
+
+  // Initialize Accounts -> Security Questions when that module is opened
+  useEffect(() => {
+    if (activeModule !== 'accounts') return;
+    let unsub;
+    const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
+
+    const init = async () => {
+      try {
+        setAccLoading(true);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(
+            ref,
+            {
+              securityQuestions: [
+                "What is your mother's maiden name?",
+                "What is the name of your first pet?",
+                "What is your favorite teacher’s name?",
+                "What city were you born in?",
+                "What was your first school?"
+              ],
+              createdAt: serverTimestamp()
+            },
+            { merge: true }
+          );
+        }
+        unsub = onSnapshot(
+          ref,
+          (s) => {
+            const d = s.data() || {};
+            setSecurityQuestions(d.securityQuestions || []);
+            setAccLoading(false);
+          },
+          (e) => {
+            console.error("accounts onSnapshot error:", e);
+            setToast({ ok: false, msg: e?.message || "Failed to load security questions." });
+            setAccLoading(false);
+          }
+        );
+      } catch (e) {
+        console.error("accounts init error:", e);
+        setToast({ ok: false, msg: e?.message || "Initialization failed." });
+        setAccLoading(false);
+      }
+    };
+
+    init();
+    return () => { if (unsub) unsub(); };
+  }, [activeModule]);
 
   const showToast = (ok, msg) => {
     setToast({ ok, msg });
@@ -161,6 +221,51 @@ const FileMaintenance = () => {
     }
   };
 
+  // Accounts: add/remove security question
+  const addSecurityQuestion = async () => {
+    const val = (sqInput || "").trim();
+    if (!val) return;
+    if ((securityQuestions || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
+      showToast(false, "Already exists.");
+      return;
+    }
+    try {
+      const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
+      await updateDoc(ref, {
+        securityQuestions: arrayUnion(val),
+        updatedAt: serverTimestamp()
+      });
+      setSqInput("");
+      showToast(true, "Added.");
+    } catch (e) {
+      console.error("Add question failed:", e);
+      showToast(false, e?.message || "Add failed.");
+    }
+  };
+
+  const askRemoveSecurityQuestion = (value) => {
+    setConfirmTargetAcc({ value });
+    setConfirmOpenAcc(true);
+  };
+
+  const doRemoveSecurityQuestion = async () => {
+    const value = confirmTargetAcc?.value;
+    if (!value) return;
+    try {
+      const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
+      await updateDoc(ref, {
+        securityQuestions: arrayRemove(value),
+        updatedAt: serverTimestamp()
+      });
+      setConfirmOpenAcc(false);
+      setConfirmTargetAcc(null);
+      showToast(true, "Removed.");
+    } catch (e) {
+      console.error("Remove question failed:", e);
+      showToast(false, e?.message || "Remove failed.");
+    }
+  };
+
   // Card renderer with "view more"
   const section = (title, keyName, placeholder) => {
     const limit = 5;
@@ -225,6 +330,52 @@ const FileMaintenance = () => {
       </div>
     );
   };
+
+  // Accounts section renderer
+  const accountsSection = (
+    <div className="bg-white rounded-lg shadow p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-800">Security Questions</h3>
+        <div className="flex gap-2">
+          <input
+            value={sqInput}
+            onChange={(e) => setSqInput(e.target.value)}
+            placeholder="e.g., What is your favorite teacher’s name?"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-0 focus:outline-none focus-visible:outline-none"
+          />
+          <button
+            onClick={addSecurityQuestion}
+            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-sm"
+          >
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+      </div>
+
+      {accLoading ? (
+        <div className="text-gray-600 flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
+        </div>
+      ) : securityQuestions.length ? (
+        <ul className="divide-y divide-gray-200 min-h-[140px]">
+          {securityQuestions.map((q) => (
+            <li key={`sq-${q}`} className="flex items-center justify-between py-2">
+              <span className="text-sm">{q}</span>
+              <button
+                onClick={() => askRemoveSecurityQuestion(q)}
+                className="text-red-600 hover:text-red-800"
+                title="Remove"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-gray-500">No security questions yet.</p>
+      )}
+    </div>
+  );
 
   // Top selector grid
   const selectorGrid = (
@@ -299,11 +450,35 @@ const FileMaintenance = () => {
       );
     }
 
-    if (activeModule === 'pest' || activeModule === 'disease' || activeModule === 'accounts') {
+    if (activeModule === 'accounts') {
+      return (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveModule(null)}
+                className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                ← Back
+              </button>
+              <div>
+                <h2 className="text-xl font-semibold">Accounts</h2>
+                <p className="text-gray-600 text-sm">Manage account-related lists</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {accountsSection}
+          </div>
+        </>
+      );
+    }
+
+    if (activeModule === 'pest' || activeModule === 'disease') {
       const titles = {
         pest: "Pest",
-        disease: "Rice Disease",
-        accounts: "Accounts"
+        disease: "Rice Disease"
       };
       return (
         <>
@@ -361,6 +536,21 @@ const FileMaintenance = () => {
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpen(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
               <button onClick={doRemove} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmOpenAcc && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
+            <h4 className="text-lg font-semibold mb-2 text-red-600">Confirm Remove</h4>
+            <p className="text-sm text-gray-700">
+              Remove “{confirmTargetAcc?.value}” from Security Questions? This will affect Forgot Password verification.
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmOpenAcc(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
+              <button onClick={doRemoveSecurityQuestion} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
             </div>
           </div>
         </div>

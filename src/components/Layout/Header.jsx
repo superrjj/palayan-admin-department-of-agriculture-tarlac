@@ -1,8 +1,8 @@
-// components/Header.jsx
+// src/components/Layout/Header.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Menu, Settings, LogOut, User, ChevronDown, Camera, Mail, Key, Phone, X, Loader2, ZoomIn, ZoomOut, Crop as CropIcon } from 'lucide-react';
 import { db } from '../../firebase/config';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { getAuth, updateEmail, sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
@@ -273,14 +273,28 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
   const [error, setError] = useState('');
   const overlayRef = useRef(null);
 
-  // Security questions state (user-managed here)
-  const securityQuestions = [
-    "What is your mother's maiden name?",
-    "What is the name of your first pet?",
-    "What is your favorite teacher’s name?",
-    "What city were you born in?",
-    "What was your first school?",
-  ];
+  // Dynamic security questions
+  const [securityQuestions, setSecurityQuestions] = useState([]);
+  useEffect(() => {
+    const ref = doc(db, "maintenance", "accounts_enums");
+    const unsub = onSnapshot(ref, (snap) => {
+      const d = snap.data() || {};
+      const list = Array.isArray(d.securityQuestions) ? d.securityQuestions : [];
+      setSecurityQuestions(
+        list.length
+          ? list
+          : [
+              "What is your mother's maiden name?",
+              "What is the name of your first pet?",
+              "What is your favorite teacher’s name?",
+              "What city were you born in?",
+              "What was your first school?",
+            ]
+      );
+    });
+    return () => unsub();
+  }, []);
+
   const [securityQuestion, setSecurityQuestion] = useState(initialData.securityQuestion || '');
   const [securityAnswer, setSecurityAnswer] = useState(initialData.securityAnswer || '');
 
@@ -381,7 +395,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
       const userId = localStorage.getItem('admin_token');
       if (!userId) throw new Error('No user id');
 
-      // If user selects a question, require answer
       if (securityQuestion && !securityAnswer.trim()) {
         setSaving(false);
         setError('Please provide an answer to your selected security question.');
