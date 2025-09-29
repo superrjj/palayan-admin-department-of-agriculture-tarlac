@@ -21,6 +21,8 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const logout = () => {
+      // mark reason for AdminLogin modal
+      localStorage.setItem("auto_logout_reason", "inactivity");
       localStorage.removeItem("admin_token");
       localStorage.removeItem("session_id");
       navigate("/login");
@@ -57,6 +59,8 @@ const AdminDashboard = () => {
 
       const userDoc = await getDoc(doc(db, "accounts", token));
       if (!userDoc.exists() || userDoc.data().currentSession !== sessionId) {
+        // mark reason for AdminLogin modal
+        localStorage.setItem("auto_logout_reason", "session_ended");
         localStorage.removeItem("admin_token");
         localStorage.removeItem("session_id");
         navigate("/login");

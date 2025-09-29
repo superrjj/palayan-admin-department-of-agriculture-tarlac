@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchUsers } from "../service/userService";
 import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { db } from "../firebase/config";
-import { User, Lock, Eye, EyeOff, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, LogOut, ArrowRight, Sun, CheckCircle, XCircle } from 'lucide-react';
 import { v4 as uuidv4 } from "uuid";
 import { useRole } from "../contexts/RoleContext";
 import bcrypt from 'bcryptjs';
@@ -21,6 +21,10 @@ export default function AdminLogin() {
   // Restricted dialog
   const [showRestricted, setShowRestricted] = useState(false);
   const [restrictedMsg, setRestrictedMsg] = useState('Your account is currently restricted.');
+
+  // Auto logout dialog
+  const [showAutoLogout, setShowAutoLogout] = useState(false);
+  const [autoLogoutMsg, setAutoLogoutMsg] = useState('');
 
   // Forgot password states
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -44,6 +48,20 @@ export default function AdminLogin() {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Show auto-logout modal if dashboard set a reason
+  useEffect(() => {
+    const reason = localStorage.getItem("auto_logout_reason");
+    if (reason) {
+      const msg =
+        reason === "inactivity"
+          ? "You were logged out due to inactivity."
+          : "Your session has ended. Please log in again.";
+      setAutoLogoutMsg(msg);
+      setShowAutoLogout(true);
+      localStorage.removeItem("auto_logout_reason");
+    }
   }, []);
 
   useEffect(() => {
@@ -341,6 +359,28 @@ export default function AdminLogin() {
         </div>
       </div>
 
+      {/* Auto logout dialog */}
+      {showAutoLogout && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
+            <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+              <LogOut className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Auto logout</h3>
+            <p className="text-sm text-gray-600">{autoLogoutMsg}</p>
+            <div className="mt-5 flex justify-center">
+              <button
+                onClick={() => setShowAutoLogout(false)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restricted dialog */}
       {showRestricted && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-[22rem] text-center shadow-2xl">
@@ -361,6 +401,7 @@ export default function AdminLogin() {
         </div>
       )}
 
+      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 transition-opacity animate-fade-in">
           <div className="bg-white rounded-3xl p-6 w-96 shadow-2xl transform transition-all duration-300">
