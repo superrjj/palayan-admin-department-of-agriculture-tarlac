@@ -71,10 +71,12 @@ export default function AdminLogin() {
   useEffect(() => {
     const reason = localStorage.getItem("auto_logout_reason");
     if (reason) {
-      const msg =
-        reason === "inactivity"
-          ? "Your session has ended. Please log in again."
-          : "You have been logged out because your account was accessed from another device.";
+      let msg = "Your session has ended. Please log in again.";
+      if (reason === "other_device") {
+        msg = "You have been logged out because your account was accessed from another device.";
+      } else if (reason === "inactivity") {
+        msg = "Your session has ended due to inactivity. Please log in again.";
+      }
       setAutoLogoutMsg(msg);
       setShowAutoLogout(true);
       localStorage.removeItem("auto_logout_reason");
@@ -490,7 +492,7 @@ export default function AdminLogin() {
                     { rule: "length", label: "At least 8 characters", passed: newPassword.length >= 8 },
                     { rule: "uppercase", label: "One uppercase letter", passed: /[A-Z]/.test(newPassword) },
                     { rule: "number", label: "One number", passed: /[0-9]/.test(newPassword) },
-                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword) },
+                    { rule: "special", label: "One special character", passed: /[!@#$%^&*(),.?\":{}|<>]/.test(newPassword) },
                   ].map(({ rule, label, passed }) => (
                     <div key={rule} className="flex items-center gap-1">
                       {passed ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-400" />}
