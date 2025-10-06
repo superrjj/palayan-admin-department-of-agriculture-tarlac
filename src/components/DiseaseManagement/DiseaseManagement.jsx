@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import DiseaseHeader from './DiseaseHeader';
 import AddDiseaseModal from './AddDiseaseModal';
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
+
+const normalizeAffectedParts = (v) =>
+  Array.isArray(v)
+    ? v
+    : (typeof v === 'string' && v.trim())
+      ? v.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
 
 const DiseaseManagement = () => {
   const [diseases, setDiseases] = useState([]);
@@ -70,7 +77,13 @@ const DiseaseManagement = () => {
     const unsub = onSnapshot(
       collection(db, "rice_local_diseases"),
       snapshot => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const data = snapshot.docs.map(snap => {
+          const d = { id: snap.id, ...snap.data() };
+          return {
+            ...d,
+            affectedParts: normalizeAffectedParts(d.affectedParts),
+          };
+        });
         setDiseases(data);
         setLoading(false);
       },
@@ -106,6 +119,7 @@ const DiseaseManagement = () => {
         cause: diseaseData.cause || "",
         symptoms: diseaseData.symptoms || "",
         treatments: diseaseData.treatments || "",
+        affectedParts: normalizeAffectedParts(diseaseData.affectedParts), // include and normalize
         mainImageUrl: diseaseData.mainImageUrl || "",
         images: diseaseData.images || [],
       };
@@ -113,7 +127,7 @@ const DiseaseManagement = () => {
       if (id) {
         // capture previous state for audit
         const prevSnap = await getDoc(doc(db, "rice_local_diseases", id));
-        const before = prevSnap.exists() ? { id, ...prevSnap.data() } : null;
+        const before = prevSnap.exists() ? { id, ...prevSnap.data(), affectedParts: normalizeAffectedParts(prevSnap.data().affectedParts) } : null;
 
         dataToSave.updatedAt = new Date();
         await updateDoc(doc(db, "rice_local_diseases", id), dataToSave);
@@ -171,7 +185,11 @@ const DiseaseManagement = () => {
   };
 
   const handleEdit = (disease) => {
-    setEditDisease(disease);
+    // ensure affectedParts is normalized when passing to modal
+    setEditDisease({
+      ...disease,
+      affectedParts: normalizeAffectedParts(disease.affectedParts),
+    });
     setIsModalOpen(true);
   };
 
@@ -182,7 +200,7 @@ const DiseaseManagement = () => {
       // capture full doc for audit before deleting
       const before = diseases.find(d => d.id === id) || (await (async () => {
         const snap = await getDoc(doc(db, "rice_local_diseases", id));
-        return snap.exists() ? { id, ...snap.data() } : null;
+        return snap.exists() ? { id, ...snap.data(), affectedParts: normalizeAffectedParts(snap.data().affectedParts) } : null;
       })());
 
       await deleteDoc(doc(db, "rice_local_diseases", id));
@@ -282,6 +300,17 @@ const DiseaseManagement = () => {
                 {disease.description}
               </p>
             )}
+
+              {/* NEW: affected parts chips */}
+              {Array.isArray(disease.affectedParts) && disease.affectedParts.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {disease.affectedParts.map((p, idx) => (
+                    <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-3 text-xs text-gray-500 space-y-1">
                 <p><span className="font-medium">Created Date:</span> {disease.createdAt?.toDate ? disease.createdAt.toDate().toLocaleString() : "N/A"}</p>
@@ -467,6 +496,19 @@ const DiseaseManagement = () => {
                 </span>
               </p>
             )}
+
+              {Array.isArray(viewDisease.affectedParts) && viewDisease.affectedParts.length > 0 && (
+                <div>
+                  <strong>Affected Part(s):</strong>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {viewDisease.affectedParts.map((p, idx) => (
+                      <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col text-gray-500 text-sm mt-2 space-y-1">
                 <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Created: {viewDisease.createdAt?.toDate ? viewDisease.createdAt.toDate().toLocaleString() : "-"}</div>

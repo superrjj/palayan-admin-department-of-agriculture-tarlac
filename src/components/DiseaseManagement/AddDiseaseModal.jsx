@@ -1,7 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, UploadCloud, Book, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../../firebase/config";
+
+const normalizeAffectedParts = (v) =>
+  Array.isArray(v)
+    ? v
+    : (typeof v === "string" && v.trim())
+      ? v.split(",").map(s => s.trim()).filter(Boolean)
+      : [];
 
 const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const [formData, setFormData] = useState({
@@ -11,6 +18,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     cause: diseaseData?.cause || "",
     symptoms: diseaseData?.symptoms || "",
     treatments: diseaseData?.treatments || "",
+    affectedParts: normalizeAffectedParts(diseaseData?.affectedParts),
   });
 
   const [images, setImages] = useState([]);
@@ -18,10 +26,32 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const isEdit = !!diseaseData;
 
-
+  useEffect(() => {
+    if (!diseaseData) return;
+    setFormData(prev => ({
+      ...prev,
+      name: diseaseData.name || "",
+      scientificName: diseaseData.scientificName || "",
+      description: diseaseData.description || "",
+      cause: diseaseData.cause || "",
+      symptoms: diseaseData.symptoms || "",
+      treatments: diseaseData.treatments || "",
+      affectedParts: normalizeAffectedParts(diseaseData.affectedParts),
+    }));
+  }, [diseaseData]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+
+    if (type === "checkbox" && name === "affectedParts") {
+      setFormData((prev) => {
+        const set = new Set(prev.affectedParts || []);
+        checked ? set.add(value) : set.delete(value);
+        return { ...prev, affectedParts: Array.from(set) };
+      });
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
     console.log(`Field ${name} changed to:`, value);
   };
@@ -30,7 +60,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     const files = Array.from(e.target.files);
     console.log("Selected files:", files);
     
-    if (files.length + images.length > 2000) { //Reduced limit for testing
+    if (files.length + images.length > 2000) {
       alert("You can upload a maximum of 2000 images.");
       return;
     }
@@ -81,7 +111,6 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.name.trim()) {
       alert("Disease name is required.");
       return;
@@ -98,15 +127,13 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       let imageUrls = [];
       let mainImageUrl = diseaseData?.mainImageUrl || "";
 
-      // Upload new images if any
       if (images.length > 0) {
         console.log("Uploading", images.length, "images...");
         imageUrls = await uploadImages(images);
-        mainImageUrl = imageUrls[0]; // Use first uploaded image as main
+        mainImageUrl = imageUrls[0] || mainImageUrl;
         console.log("All images uploaded:", imageUrls);
       }
 
-      // Prepare data to save
       const dataToSave = {
         name: formData.name.trim(),
         scientificName: formData.scientificName.trim(),
@@ -114,21 +141,17 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         cause: formData.cause.trim(),
         symptoms: formData.symptoms.trim(),
         treatments: formData.treatments.trim(),
+        affectedParts: Array.isArray(formData.affectedParts) ? formData.affectedParts : normalizeAffectedParts(formData.affectedParts),
         mainImageUrl: mainImageUrl,
         images: imageUrls.length > 0 ? imageUrls : (diseaseData?.images || []),
       };
 
       console.log("Calling onSave with data:", dataToSave);
       
-      // Call the parent's save function
       await onSave(dataToSave, diseaseData?.id);
       
-
-      // Reset form
       setImages([]);
       setUploadProgress(0);
-      
-      // Don't close modal here - let parent handle it
       
     } catch (error) {
       console.error("Error in form submission:", error);
@@ -146,6 +169,8 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     symptoms: Stethoscope,
     treatments: Heart,
   };
+
+  const affectedPartOptions = ["Dahon", "Tangkay", "Bunga", "Ugat"];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -204,6 +229,26 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
               </div>
             );
           })}
+
+          {/* Affected Parts */}
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Affected Part(s)</label>
+            <div className="flex flex-wrap gap-3">
+              {affectedPartOptions.map((part) => (
+                <label key={part} className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="affectedParts"
+                    value={part}
+                    checked={Array.isArray(formData.affectedParts) && formData.affectedParts.includes(part)}
+                    onChange={handleChange}
+                    disabled={uploading}
+                  />
+                  <span className="text-sm">{part}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           {/* Show existing images if editing */}
           {isEdit && diseaseData?.images && diseaseData.images.length > 0 && (
