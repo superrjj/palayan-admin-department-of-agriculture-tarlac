@@ -73,8 +73,8 @@ export default function AdminLogin() {
     if (reason) {
       const msg =
         reason === "inactivity"
-          ? "You were logged out due to inactivity."
-          : "Your session has ended. Please log in again.";
+          ? "Your session has ended. Please log in again."
+          : "You have been logged out because your account was accessed from another device.";
       setAutoLogoutMsg(msg);
       setShowAutoLogout(true);
       localStorage.removeItem("auto_logout_reason");
