@@ -13,6 +13,7 @@ const normalizeAffectedParts = (v) =>
 const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const [formData, setFormData] = useState({
     name: diseaseData?.name || "",
+    localName: diseaseData?.localName || "",
     scientificName: diseaseData?.scientificName || "",
     description: diseaseData?.description || "",
     cause: diseaseData?.cause || "",
@@ -31,6 +32,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     setFormData(prev => ({
       ...prev,
       name: diseaseData.name || "",
+      localName: diseaseData.localName || "",
       scientificName: diseaseData.scientificName || "",
       description: diseaseData.description || "",
       cause: diseaseData.cause || "",
@@ -136,6 +138,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
 
       const dataToSave = {
         name: formData.name.trim(),
+        localName: formData.localName.trim(),
         scientificName: formData.scientificName.trim(),
         description: formData.description.trim(),
         cause: formData.cause.trim(),
@@ -163,6 +166,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
 
   const fieldIcons = {
     name: Book,
+    localName: Book,
     scientificName: Globe,
     description: Info,
     cause: AlertCircle,
@@ -189,10 +193,11 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
+          {["name", "localName", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
             const Icon = fieldIcons[field];
             const label =
               field === "name" ? "Disease Name" :
+              field === "localName" ? "Local Name" :
               field === "scientificName" ? "Scientific Name" :
               field.charAt(0).toUpperCase() + field.slice(1);
 

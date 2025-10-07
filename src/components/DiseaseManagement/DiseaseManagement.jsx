@@ -97,6 +97,7 @@ const DiseaseManagement = () => {
 
   const filteredDiseases = diseases.filter(d =>
     (d.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (d.localName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (d.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -114,6 +115,7 @@ const DiseaseManagement = () => {
     try {
       const dataToSave = {
         name: diseaseData.name || "",
+        localName: diseaseData.localName || "",
         scientificName: diseaseData.scientificName || "",
         description: diseaseData.description || "",
         cause: diseaseData.cause || "",
@@ -282,6 +284,7 @@ const DiseaseManagement = () => {
                 />
               )}
               <h3 className="font-semibold text-lg">{disease.name || 'Unnamed Disease'}</h3>
+              {disease.localName && <p className="text-sm text-gray-700">{disease.localName}</p>}
               {disease.scientificName && <p className="text-sm italic text-gray-600">{disease.scientificName}</p>}
               {disease.description && (
               <p 
@@ -425,7 +428,6 @@ const DiseaseManagement = () => {
             </button>
 
             <h2 className="text-2xl font-bold mb-4">{viewDisease.name || "Unnamed Disease"}</h2>
-
             {viewDisease.mainImageUrl && (
               <img
                 src={viewDisease.mainImageUrl}
@@ -435,6 +437,7 @@ const DiseaseManagement = () => {
             )}
 
             <div className="space-y-3 text-gray-700">
+              {viewDisease.localName && <p><strong>Local Name:</strong> {viewDisease.localName}</p>}
               {viewDisease.scientificName && <p><strong>Scientific Name:</strong> {viewDisease.scientificName}</p>}
               {viewDisease.description && (
               <p>

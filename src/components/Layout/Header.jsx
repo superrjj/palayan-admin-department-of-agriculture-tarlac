@@ -103,6 +103,16 @@ const Header = ({ setIsSidebarOpen }) => {
     }
   };
 
+  // real-time date/time (Philippines), split lines
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const weekday = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', weekday: 'long' });
+  const datePart = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric' });
+  const timePart = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center h-16 px-4">
@@ -112,6 +122,14 @@ const Header = ({ setIsSidebarOpen }) => {
         >
           <Menu className="h-6 w-6" />
         </button>
+
+        <div className="hidden sm:flex flex-col ml-4 text-gray-700 leading-tight">
+          <div className="text-sm">
+            <span className="font-medium">{weekday}, </span>
+            <span>{datePart}</span>
+          </div>
+          <div className="text-xs">{timePart}</div>
+        </div>
 
         <div className="flex items-center space-x-4 ml-auto">
           <div className="relative">
