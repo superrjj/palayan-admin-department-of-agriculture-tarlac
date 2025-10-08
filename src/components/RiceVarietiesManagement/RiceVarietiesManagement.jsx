@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import RiceVarietyHeader from '../RiceVarietiesManagement/RiceVarietyHeader';
 import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc, query, where } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
 const RiceVarietiesManagement = () => {
@@ -21,24 +21,33 @@ const RiceVarietiesManagement = () => {
   });
   const itemsPerPage = 20;
 
-  // NEW: Confirm Delete Dialog state
+  // Confirm Delete Dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmTarget, setConfirmTarget] = useState(null); // { id, varietyName }
+  const [confirmTarget, setConfirmTarget] = useState(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  // Get current user from localStorage and Firestore
+  // Sort dropdown + filters state (filters panel is toggled in the header UI)
+  const [sortBy, setSortBy] = useState('name-asc'); // name-asc | name-desc | year-desc | year-asc
+  const [filters, setFilters] = useState({
+    yearRange: '',            // Individual year (2012, 2013, etc.) | ''
+    season: '',               // 'Dry' | 'Wet' | 'Both' | ''
+    plantingMethod: '',       // 'Transplant' | 'Direct Seed' | ''
+    environment: '',          // 'Rainfed' | 'Irrigated' | 'Upland' | 'All' | ''
+    location: '',             // free text
+    recommendedInTarlac: '',  // 'yes' | ''
+  });
+
+  // Get current user
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
         const adminToken = localStorage.getItem("admin_token");
         const sessionId = localStorage.getItem("session_id");
-        
         if (adminToken && sessionId) {
           const userDoc = await getDoc(doc(db, "accounts", adminToken));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            // Verify session
             if (userData.currentSession === sessionId) {
               setCurrentUser({
                 id: userData.id || adminToken,
@@ -46,15 +55,8 @@ const RiceVarietiesManagement = () => {
                 username: userData.username || 'unknown',
                 email: userData.email || 'unknown@example.com'
               });
-              console.log("Current user loaded:", userData.fullname);
-            } else {
-              console.log("Session mismatch, using default user");
             }
-          } else {
-            console.log("User document not found, using default user");
           }
-        } else {
-          console.log("No admin token or session, using default user");
         }
       } catch (error) {
         console.error("Error fetching current user:", error);
@@ -65,42 +67,25 @@ const RiceVarietiesManagement = () => {
 
   // Realtime fetch rice varieties from Firestore (only non-deleted)
   useEffect(() => {
-    console.log("Setting up Firestore listener for rice varieties...");
-    
-    // Try different query approaches
     let q;
     try {
-      // First try: documents where isDeleted is explicitly false
       q = query(
         collection(db, "rice_seed_varieties"),
         where("isDeleted", "==", false)
       );
-      console.log("Using query with isDeleted == false");
     } catch (error) {
-      console.log("Query with isDeleted == false failed, trying alternative...");
-      // Fallback: get all documents and filter in JavaScript
       q = collection(db, "rice_seed_varieties");
-      console.log("Using fallback query (all documents)");
     }
-    
-    const unsub = onSnapshot(q, 
+
+    const unsub = onSnapshot(q,
       (snapshot) => {
-        console.log("Snapshot received, docs count:", snapshot.docs.length);
-        
         let data = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         }));
-        
-        // If we used the fallback query, filter out deleted items
         if (q.type === 'collection') {
           data = data.filter(item => item.isDeleted !== true);
-          console.log("Filtered out deleted items, remaining:", data.length);
         }
-        
-        console.log("Final varieties count:", data.length);
-        console.log("Varieties data:", data);
-        
         setVarieties(data);
         setLoading(false);
       },
@@ -109,25 +94,76 @@ const RiceVarietiesManagement = () => {
         setLoading(false);
       }
     );
-    
-    return () => {
-      console.log("Cleaning up Firestore listener");
-      unsub();
-    };
+
+    return () => unsub();
   }, []);
 
-  // Filtering
-  const filteredVarieties = varieties.filter(
-    (v) =>
-      (v.varietyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.yearRelease || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.location || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Helpers
+  const normalizeStr = (v) => String(v ?? '').toLowerCase().trim();
+  const toNumber = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const seasonMatches = (recordSeason, selected) => {
+    if (!selected) return true;
+    const arr = Array.isArray(recordSeason) ? recordSeason : (recordSeason ? [recordSeason] : []);
+    if (selected === 'Both') {
+      const s = new Set(arr.map(x => normalizeStr(x)));
+      return s.has('dry') && s.has('wet') || s.has('both');
+    }
+    return arr.map(x => normalizeStr(x)).includes(normalizeStr(selected));
+  };
+
+  const environmentMatches = (recordEnv, selected) => {
+    if (!selected || selected === 'All') return true;
+    const arr = Array.isArray(recordEnv) ? recordEnv : (recordEnv ? [recordEnv] : []);
+    return arr.map(x => normalizeStr(x)).includes(normalizeStr(selected));
+  };
+
+  const matchesFilters = (v) => {
+    // Year filter - now checks for exact year match
+    if (filters.yearRange && String(v.yearRelease) !== String(filters.yearRange)) return false;
+    
+    if (!seasonMatches(v.season, filters.season)) return false;
+    if (filters.plantingMethod && normalizeStr(filters.plantingMethod) !== normalizeStr(v.plantingMethod || '')) return false;
+    if (!environmentMatches(v.environment, filters.environment)) return false;
+    if (filters.location && !normalizeStr(v.location).includes(normalizeStr(filters.location))) return false;
+    if (filters.recommendedInTarlac === 'yes' && !v.recommendedInTarlac) return false;
+    return true;
+  };
+
+  const matchesSearch = (v) => {
+    const term = normalizeStr(searchTerm);
+    if (!term) return true;
+    return (
+      normalizeStr(v.varietyName).includes(term) ||
+      normalizeStr(v.yearRelease).includes(term) ||
+      normalizeStr(v.location).includes(term)
+    );
+  };
+
+  // Compute list
+  const filteredVarieties = varieties.filter(v => matchesFilters(v) && matchesSearch(v));
+
+  const sortedVarieties = [...filteredVarieties].sort((a, b) => {
+    const an = normalizeStr(a.varietyName);
+    const bn = normalizeStr(b.varietyName);
+    const ay = toNumber(a.yearRelease) ?? -Infinity;
+    const by = toNumber(b.yearRelease) ?? -Infinity;
+
+    if (sortBy === 'name-asc') return an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' });
+    if (sortBy === 'name-desc') return bn.localeCompare(an, undefined, { numeric: true, sensitivity: 'base' });
+    if (sortBy === 'year-desc') return by - ay;
+    if (sortBy === 'year-asc') return ay - by;
+    return 0;
+  });
 
   // Pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedVarieties = filteredVarieties.slice(startIndex, startIndex + itemsPerPage);
-  const totalPages = Math.ceil(filteredVarieties.length / itemsPerPage);
+  const paginatedVarieties = sortedVarieties.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(sortedVarieties.length / itemsPerPage);
 
   // Actions
   const handleAddNew = () => {
@@ -137,24 +173,14 @@ const RiceVarietiesManagement = () => {
 
   const handleAddOrEditVariety = async (varietyData, id) => {
     try {
-      console.log("Current user when saving:", currentUser);
-      console.log("Variety data to save:", varietyData);
-      
       if (id) {
-        // Get the current data before updating
         const currentVariety = varieties.find(v => v.id === id);
-        
         const updateData = {
           ...varietyData,
-          isDeleted: false, // Ensure it's not deleted
+          isDeleted: false,
           updatedAt: new Date(),
         };
-        
-        console.log("Updating variety with data:", updateData);
-        
         await updateDoc(doc(db, "rice_seed_varieties", id), updateData);
-
-        // Log the update action
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -165,26 +191,15 @@ const RiceVarietiesManagement = () => {
           documentId: id,
           documentName: varietyData.varietyName || 'Unknown',
           description: 'New updated rice variety',
-          changes: {
-            before: currentVariety,
-            after: updateData
-          }
+          changes: { before: currentVariety, after: updateData }
         });
-        
       } else {
         const newVarietyData = {
           ...varietyData,
-          isDeleted: false, // Explicitly set as not deleted
+          isDeleted: false,
           createdAt: new Date(),
         };
-
-        console.log("Creating new variety with data:", newVarietyData);
-
         const docRef = await addDoc(collection(db, "rice_seed_varieties"), newVarietyData);
-        
-        console.log("New variety created with ID:", docRef.id);
-
-        // Log the create action
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -195,14 +210,9 @@ const RiceVarietiesManagement = () => {
           documentId: docRef.id,
           documentName: varietyData.varietyName || 'Unknown',
           description: 'New added rice variety',
-          changes: {
-            before: null,
-            after: newVarietyData
-          }
+          changes: { before: null, after: newVarietyData }
         });
       }
-      
-      console.log("Variety saved successfully");
       setIsModalOpen(false);
       setEditVariety(null);
     } catch (error) {
@@ -212,12 +222,10 @@ const RiceVarietiesManagement = () => {
   };
 
   const handleEdit = (variety) => {
-    console.log("Editing variety:", variety);
     setEditVariety(variety);
     setIsModalOpen(true);
   };
 
-  // Open confirm dialog instead of deleting immediately
   const handleDelete = async (id) => {
     const target = varieties.find(v => v.id === id);
     if (!target) return;
@@ -226,25 +234,17 @@ const RiceVarietiesManagement = () => {
     setConfirmOpen(true);
   };
 
-  // Execute the existing soft delete after confirmation
   const confirmDeleteNow = async () => {
     if (!confirmTarget) return;
     setConfirmBusy(true);
     try {
       const id = confirmTarget.id;
       const varietyToDelete = varieties.find(v => v.id === id);
-      console.log("Deleting variety with ID:", id, "->", varietyToDelete);
-
-      // Soft delete
       await updateDoc(doc(db, "rice_seed_varieties", id), {
         isDeleted: true,
         deletedAt: new Date(),
         deletedBy: currentUser.id
       });
-      
-      console.log("Variety soft deleted successfully");
-      
-      // Log the delete action
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
         userName: currentUser.fullname,
@@ -255,16 +255,9 @@ const RiceVarietiesManagement = () => {
         documentId: id,
         documentName: varietyToDelete?.varietyName || 'Unknown',
         description: 'Deleted rice variety',
-        changes: {
-          before: varietyToDelete,
-          after: null
-        }
+        changes: { before: varietyToDelete, after: null }
       });
-
-      // Remove from local state
       setVarieties((prev) => prev.filter((v) => v.id !== id));
-
-      // Close confirm dialog, show success animation
       setConfirmBusy(false);
       setConfirmOpen(false);
       setSuccessDelete(true);
@@ -284,6 +277,10 @@ const RiceVarietiesManagement = () => {
         onAddNew={handleAddNew}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        filters={filters}
+        setFilters={setFilters}
       />
 
       <RiceVarietyTable
@@ -307,7 +304,6 @@ const RiceVarietiesManagement = () => {
         />
       )}
 
-      {/* Confirm Delete Dialog */}
       {confirmOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
@@ -345,11 +341,10 @@ const RiceVarietiesManagement = () => {
         </div>
       )}
 
-      {/* Success Delete Animation */}
       {successDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
-            <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
+            <svg className="w-20 h-20 text-green-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             <h3 className="text-lg font-semibold text-green-600">Rice variety deleted successfully!</h3>
