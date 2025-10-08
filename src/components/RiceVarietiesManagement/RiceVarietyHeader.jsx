@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Wheat, ArrowUpDown, Filter, ChevronDown } from 'lucide-react';
 import { useRiceEnums } from '../../hooks/useRiceEnums';
 
@@ -11,8 +11,19 @@ const RiceVarietyHeader = ({
   filters,
   setFilters,
 }) => {
-  const [showFilters, setShowFilters] = useState(false);
-  const [showSort, setShowSort] = useState(false);
+const [showFilters, setShowFilters] = useState(false);
+const [showSort, setShowSort] = useState(false);
+const sortRef = useRef(null);
+
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (sortRef.current && !sortRef.current.contains(e.target)) {
+      setShowSort(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   // Get enums from your file maintenance
   const { seasons, plantingMethods, environments, yearReleases } = useRiceEnums();
@@ -56,51 +67,67 @@ const RiceVarietyHeader = ({
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Sort Dropdown Button */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowSort(v => !v)}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
-              >
-                <ArrowUpDown className="w-4 h-4 text-gray-500" />
-                <span>{getSortLabel(sortBy)}</span>
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              </button>
-
-              {/* Sort Dropdown Menu */}
-              {showSort && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-10">
-                  <div className="py-1">
-                    <button
-                      onClick={() => { setSortBy('name-asc'); setShowSort(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-asc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
-                    >
-                      Sort by Ascending
-                    </button>
-                    <button
-                      onClick={() => { setSortBy('name-desc'); setShowSort(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-desc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
-                    >
-                      Sort by Descending
-                    </button>
-                    <button
-                      onClick={() => { setSortBy('year-desc'); setShowSort(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'year-desc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
-                    >
-                      Recently Added
-                    </button>
-                    <button
-                      onClick={() => { setSortBy('year-asc'); setShowSort(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'year-asc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
-                    >
-                      Oldest Added
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+          
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                {/* Sort Dropdown Button */}
+                                <div className="relative" ref={sortRef}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowSort(v => !v)}
+                                    className="px-10 py-3 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={showSort}
+                                  >
+                                    <ArrowUpDown className="w-4 h-4 text-gray-500" />
+                                    <span>{getSortLabel(sortBy)}</span>
+                                    <ChevronDown
+                                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${showSort ? 'rotate-180' : 'rotate-0'}`}
+                                    />
+                                  </button>
+                    
+                                  {/* Sort Dropdown Menu (animated) */}
+                                  <div
+                                    className={`absolute top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-10 origin-top transition-all duration-200
+                                      ${showSort ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
+                                    role="listbox"
+                                  >
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => { setSortBy('name-asc'); setShowSort(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-asc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        role="option"
+                                        aria-selected={sortBy === 'name-asc'}
+                                      >
+                                        Sort by Ascending
+                                      </button>
+                                      <button
+                                        onClick={() => { setSortBy('name-desc'); setShowSort(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-desc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        role="option"
+                                        aria-selected={sortBy === 'name-desc'}
+                                      >
+                                        Sort by Descending
+                                      </button>
+                                      <button
+                                        onClick={() => { setSortBy('recent'); setShowSort(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'recent' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        role="option"
+                                        aria-selected={sortBy === 'recent'}
+                                      >
+                                        Recently Added
+                                      </button>
+                                      <button
+                                        onClick={() => { setSortBy('oldest'); setShowSort(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'oldest' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
+                                        role="option"
+                                        aria-selected={sortBy === 'oldest'}
+                                      >
+                                        Oldest Added
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+            
 
             {/* Filter Toggle Button */}
             <button

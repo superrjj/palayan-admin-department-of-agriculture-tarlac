@@ -38,7 +38,12 @@ const DiseaseManagement = () => {
   const [confirmText, setConfirmText] = useState('');
 
   // NEW: sorting + filters for header
-  const [sortBy, setSortBy] = useState(''); // 'name-asc' | 'name-desc' | 'recent' | 'oldest'
+  const [sortBy, setSortBy] = useState('name-asc'); 
+
+   useEffect(() => {
+      if (!sortBy) setSortBy('name-asc');
+    }, [sortBy, setSortBy]);
+
   const [filters, setFilters] = useState({
     yearRange: '',
     season: '',

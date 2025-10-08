@@ -24,7 +24,12 @@ const PestManagement = () => {
   const [saveAction, setSaveAction] = useState('');
 
   // NEW: sorting and filters for header
-  const [sortBy, setSortBy] = useState('');
+  const [sortBy, setSortBy] = useState('name-asc');
+
+  useEffect(() => {
+    if (!sortBy) setSortBy('name-asc');
+  }, [sortBy, setSortBy]);
+
   const [filters, setFilters] = useState({
     yearRange: '',
     season: '',
