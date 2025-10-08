@@ -37,6 +37,17 @@ const DiseaseManagement = () => {
   // NEW: type-to-confirm input state
   const [confirmText, setConfirmText] = useState('');
 
+  // NEW: sorting + filters for header
+  const [sortBy, setSortBy] = useState(''); // 'name-asc' | 'name-desc' | 'recent' | 'oldest'
+  const [filters, setFilters] = useState({
+    yearRange: '',
+    season: '',
+    plantingMethod: '',
+    environment: '',
+    location: '',
+    recommendedInTarlac: '',
+  });
+
   // current user for audit logs 
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
@@ -95,16 +106,47 @@ const DiseaseManagement = () => {
     return () => unsub();
   }, []);
 
+  const getTimestampMs = (ts) => {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.toDate) return ts.toDate().getTime();
+    if (ts instanceof Date) return ts.getTime();
+    return 0;
+  };
+
   const filteredDiseases = diseases.filter(d =>
     (d.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (d.localName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (d.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Apply sorting based on sortBy
+  const sortedDiseases = [...filteredDiseases].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc':
+        return (a.name || '').localeCompare(b.name || '');
+      case 'name-desc':
+        return (b.name || '').localeCompare(a.name || '');
+      case 'recent': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return bMs - aMs;
+      }
+      case 'oldest': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return aMs - bMs;
+      }
+      default:
+        return 0;
+    }
+  });
+
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedDiseases = filteredDiseases.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedDiseases = sortedDiseases.slice(startIndex, startIndex + itemsPerPage);
   // eslint-disable-next-line no-unused-vars
-  const totalPages = Math.ceil(filteredDiseases.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedDiseases.length / itemsPerPage);
 
   const handleAddNew = () => {
     setEditDisease(null);
@@ -121,20 +163,18 @@ const DiseaseManagement = () => {
         cause: diseaseData.cause || "",
         symptoms: diseaseData.symptoms || "",
         treatments: diseaseData.treatments || "",
-        affectedParts: normalizeAffectedParts(diseaseData.affectedParts), // include and normalize
+        affectedParts: normalizeAffectedParts(diseaseData.affectedParts),
         mainImageUrl: diseaseData.mainImageUrl || "",
         images: diseaseData.images || [],
       };
 
       if (id) {
-        // capture previous state for audit
         const prevSnap = await getDoc(doc(db, "rice_local_diseases", id));
         const before = prevSnap.exists() ? { id, ...prevSnap.data(), affectedParts: normalizeAffectedParts(prevSnap.data().affectedParts) } : null;
 
         dataToSave.updatedAt = new Date();
         await updateDoc(doc(db, "rice_local_diseases", id), dataToSave);
 
-        // audit log: UPDATE
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -156,7 +196,6 @@ const DiseaseManagement = () => {
         dataToSave.createdAt = new Date();
         const docRef = await addDoc(collection(db, "rice_local_diseases"), dataToSave);
 
-        // audit log: CREATE
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
           userName: currentUser.fullname,
@@ -187,7 +226,6 @@ const DiseaseManagement = () => {
   };
 
   const handleEdit = (disease) => {
-    // ensure affectedParts is normalized when passing to modal
     setEditDisease({
       ...disease,
       affectedParts: normalizeAffectedParts(disease.affectedParts),
@@ -199,7 +237,6 @@ const DiseaseManagement = () => {
     try {
       setSuccessDelete(true);
 
-      // capture full doc for audit before deleting
       const before = diseases.find(d => d.id === id) || (await (async () => {
         const snap = await getDoc(doc(db, "rice_local_diseases", id));
         return snap.exists() ? { id, ...snap.data(), affectedParts: normalizeAffectedParts(snap.data().affectedParts) } : null;
@@ -207,7 +244,6 @@ const DiseaseManagement = () => {
 
       await deleteDoc(doc(db, "rice_local_diseases", id));
 
-      // audit log: DELETE
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
         userName: currentUser.fullname,
@@ -259,6 +295,10 @@ const DiseaseManagement = () => {
         onAddNew={handleAddNew}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        filters={filters}
+        setFilters={setFilters}
       />
 
       {loading ? (
@@ -304,7 +344,6 @@ const DiseaseManagement = () => {
               </p>
             )}
 
-              {/* NEW: affected parts chips */}
               {Array.isArray(disease.affectedParts) && disease.affectedParts.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {disease.affectedParts.map((p, idx) => (
@@ -320,7 +359,6 @@ const DiseaseManagement = () => {
                 <p><span className="font-medium">Last Updated:</span> {disease.updatedAt?.toDate ? disease.updatedAt.toDate().toLocaleString() : "-"}</p>
               </div>
 
-              {/* Clickable icons */}
            <div className="flex justify-center gap-2 mt-3">
             <button
               onClick={() => setViewDisease(disease)}
@@ -358,7 +396,6 @@ const DiseaseManagement = () => {
         />
       )}
 
-      {/* Delete Confirm Modal with type-to-confirm */}
       {showDeleteModal && selectedDisease && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
@@ -416,7 +453,6 @@ const DiseaseManagement = () => {
         </div>
       )}
 
-      {/* View Disease Card */}
       {viewDisease && (
         <div className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto">

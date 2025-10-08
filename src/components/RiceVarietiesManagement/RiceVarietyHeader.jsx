@@ -31,10 +31,10 @@ const RiceVarietyHeader = ({
 
   const getSortLabel = (value) => {
     switch(value) {
-      case 'name-asc': return 'A → Z (Variety Name)';
-      case 'name-desc': return 'Z → A (Variety Name)';
-      case 'year-desc': return 'Newest First (Year Released)';
-      case 'year-asc': return 'Oldest First (Year Released)';
+      case 'name-asc': return 'Sort by Ascending';
+      case 'name-desc': return 'Sort by Descending';
+      case 'year-desc': return 'Recently Added';
+      case 'year-asc': return 'Oldest Added';
       default: return 'Sort By';
     }
   };
@@ -77,25 +77,25 @@ const RiceVarietyHeader = ({
                       onClick={() => { setSortBy('name-asc'); setShowSort(false); }}
                       className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-asc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
                     >
-                      A → Z (Variety Name)
+                      Sort by Ascending
                     </button>
                     <button
                       onClick={() => { setSortBy('name-desc'); setShowSort(false); }}
                       className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'name-desc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
                     >
-                      Z → A (Variety Name)
+                      Sort by Descending
                     </button>
                     <button
                       onClick={() => { setSortBy('year-desc'); setShowSort(false); }}
                       className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'year-desc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
                     >
-                      Newest First (Year Released)
+                      Recently Added
                     </button>
                     <button
                       onClick={() => { setSortBy('year-asc'); setShowSort(false); }}
                       className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortBy === 'year-asc' ? 'bg-green-50 text-green-700' : 'text-gray-700'}`}
                     >
-                      Oldest First (Year Released)
+                      Oldest Added
                     </button>
                   </div>
                 </div>
