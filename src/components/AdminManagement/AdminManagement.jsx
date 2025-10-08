@@ -1,8 +1,9 @@
+// src/components/AdminManagement/AdminManagement.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminHeader from '../AdminManagement/AdminHeader';
 import AdminTable from '../AdminManagement/AdminTable';
 import { useRole } from '../../contexts/RoleContext';
-import AddAdminModal from '../AdminManagement/AddAdminModal'; 
+import AddAdminModal from '../AdminManagement/AddAdminModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
@@ -10,7 +11,7 @@ const MS_IN_DAY = 24 * 60 * 60 * 1000;
 const INACTIVE_AFTER_DAYS = 8;
 
 const AdminManagement = () => {
-  const [admins, setAdmins] = useState([]); 
+  const [admins, setAdmins] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,6 +36,17 @@ const AdminManagement = () => {
   const [restrictTarget, setRestrictTarget] = useState(null);
   const [restrictInput, setRestrictInput] = useState('');
   const [restrictBusy, setRestrictBusy] = useState(false);
+
+  // Sorting + Filters
+  const [sortBy, setSortBy] = useState('name-asc');
+  const [filters, setFilters] = useState({
+    yearRange: '',
+    season: '',
+    plantingMethod: '',
+    environment: '',
+    location: '',
+    recommendedInTarlac: '',
+  });
 
   // userId -> true if has activity logs
   const [activityByUserId, setActivityByUserId] = useState({});
@@ -132,6 +144,15 @@ const AdminManagement = () => {
     if (!loading) checkInactiveAdmins();
   }, [loading, checkInactiveAdmins]);
 
+  const getTimestampMs = (ts) => {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.toDate) return ts.toDate().getTime();
+    if (ts instanceof Date) return ts.getTime();
+    return 0;
+  };
+
   const filteredAdmins = admins.filter(
     (a) =>
       (a.fullname || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,9 +160,31 @@ const AdminManagement = () => {
       (a.username || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Apply sorting
+  const sortedAdmins = [...filteredAdmins].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc':
+        return (a.fullname || a.username || '').localeCompare(b.fullname || b.username || '');
+      case 'name-desc':
+        return (b.fullname || b.username || '').localeCompare(a.fullname || a.username || '');
+      case 'recent': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return bMs - aMs;
+      }
+      case 'oldest': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return aMs - bMs;
+      }
+      default:
+        return 0;
+    }
+  });
+
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedAdmins = filteredAdmins.slice(startIndex, startIndex + itemsPerPage);
-  const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
+  const paginatedAdmins = sortedAdmins.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(sortedAdmins.length / itemsPerPage);
 
   const handleAddNew = () => { setEditAdmin(null); setIsModalOpen(true); };
 
@@ -310,10 +353,17 @@ const AdminManagement = () => {
   const canConfirmDelete = !!confirmTarget && confirmInput.trim() === (confirmTarget.fullname || '').trim();
   const canConfirmRestrict = !!restrictTarget && restrictInput.trim() === (restrictTarget.fullname || '').trim();
 
-
   return (
     <div className="p-4 lg:p-6">
-      <AdminHeader onAddNew={handleAddNew} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+      <AdminHeader
+        onAddNew={handleAddNew}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        filters={filters}
+        setFilters={setFilters}
+      />
 
       <AdminTable
         admins={paginatedAdmins}
@@ -384,8 +434,8 @@ const AdminManagement = () => {
 
       {successDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center animate-fadeIn scale-up">
-            <svg className="w-20 h-20 text-green-500 mb-4 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
+            <svg className="w-20 h-20 text-green-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             <h3 className="text-lg font-semibold text-green-600">Account deleted successfully!</h3>
