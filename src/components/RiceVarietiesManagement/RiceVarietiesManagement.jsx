@@ -4,6 +4,7 @@ import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 const RiceVarietiesManagement = () => {
   const [varieties, setVarieties] = useState([]);
@@ -12,7 +13,6 @@ const RiceVarietiesManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editVariety, setEditVariety] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [successDelete, setSuccessDelete] = useState(false);
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
     fullname: 'System User',
@@ -27,16 +27,24 @@ const RiceVarietiesManagement = () => {
   const [confirmInput, setConfirmInput] = useState('');
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  // Sort dropdown + filters state (filters panel is toggled in the header UI)
+  // Sort dropdown + filters state
   const [sortBy, setSortBy] = useState('name-asc'); // name-asc | name-desc | year-desc | year-asc
   const [filters, setFilters] = useState({
-    yearRange: '',            // Individual year (2012, 2013, etc.) | ''
-    season: '',               // 'Dry' | 'Wet' | 'Both' | ''
-    plantingMethod: '',       // 'Transplant' | 'Direct Seed' | ''
-    environment: '',          // 'Rainfed' | 'Irrigated' | 'Upland' | 'All' | ''
-    location: '',             // free text
-    recommendedInTarlac: '',  // 'yes' | ''
+    yearRange: '',
+    season: '',
+    plantingMethod: '',
+    environment: '',
+    location: '',
+    recommendedInTarlac: '',
   });
+
+  // Toast
+  const [toast, setToast] = useState(null); // { ok: boolean, msg: string }
+  const showToast = (ok, msg, ms = 1800) => {
+    setToast({ ok, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), ms);
+  };
 
   // Get current user
   useEffect(() => {
@@ -123,9 +131,7 @@ const RiceVarietiesManagement = () => {
   };
 
   const matchesFilters = (v) => {
-    // Year filter - now checks for exact year match
     if (filters.yearRange && String(v.yearRelease) !== String(filters.yearRange)) return false;
-    
     if (!seasonMatches(v.season, filters.season)) return false;
     if (filters.plantingMethod && normalizeStr(filters.plantingMethod) !== normalizeStr(v.plantingMethod || '')) return false;
     if (!environmentMatches(v.environment, filters.environment)) return false;
@@ -193,6 +199,7 @@ const RiceVarietiesManagement = () => {
           description: 'New updated rice variety',
           changes: { before: currentVariety, after: updateData }
         });
+        showToast(true, "Rice variety updated successfully");
       } else {
         const newVarietyData = {
           ...varietyData,
@@ -212,12 +219,13 @@ const RiceVarietiesManagement = () => {
           description: 'New added rice variety',
           changes: { before: null, after: newVarietyData }
         });
+        showToast(true, "New rice variety added successfully");
       }
       setIsModalOpen(false);
       setEditVariety(null);
     } catch (error) {
       console.error("Error saving rice variety:", error);
-      alert("Error saving rice variety: " + error.message);
+      showToast(false, "Error saving rice variety: " + error.message, 2600);
     }
   };
 
@@ -260,11 +268,10 @@ const RiceVarietiesManagement = () => {
       setVarieties((prev) => prev.filter((v) => v.id !== id));
       setConfirmBusy(false);
       setConfirmOpen(false);
-      setSuccessDelete(true);
-      setTimeout(() => setSuccessDelete(false), 1200);
+      showToast(true, "Rice variety deleted successfully");
     } catch (error) {
       console.error("Failed to delete rice variety:", error);
-      alert("Error deleting rice variety: " + error.message);
+      showToast(false, "Error deleting rice variety: " + error.message, 2600);
       setConfirmBusy(false);
     }
   };
@@ -341,14 +348,10 @@ const RiceVarietiesManagement = () => {
         </div>
       )}
 
-      {successDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <svg className="w-20 h-20 text-green-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            <h3 className="text-lg font-semibold text-green-600">Rice variety deleted successfully!</h3>
-          </div>
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow text-white flex items-center gap-2 ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>
+          {toast.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          <span className="text-sm">{toast.msg}</span>
         </div>
       )}
     </div>

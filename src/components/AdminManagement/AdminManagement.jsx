@@ -8,7 +8,7 @@ import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc, query, where, s
 import { db } from "../../firebase/config";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
-const INACTIVE_AFTER_DAYS = 8;
+const INACTIVE_AFTER_DAYS = 7;
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]);
@@ -40,12 +40,10 @@ const AdminManagement = () => {
   // Sorting + Filters
   const [sortBy, setSortBy] = useState('name-asc');
   const [filters, setFilters] = useState({
-    yearRange: '',
-    season: '',
-    plantingMethod: '',
-    environment: '',
-    location: '',
-    recommendedInTarlac: '',
+    role: '',
+    status: '',
+    createdRange: '',
+    lastLoginRange: '',
   });
 
   // userId -> true if has activity logs
@@ -118,27 +116,32 @@ const AdminManagement = () => {
   }, []);
 
   const checkInactiveAdmins = useCallback(async () => {
-    const now = Date.now();
-    for (const admin of admins) {
-      const lastLoginMs = admin?.lastLogin?.seconds
-        ? admin.lastLogin.seconds * 1000
-        : (admin?.lastLogin ? new Date(admin.lastLogin).getTime() : NaN);
-      if (!Number.isFinite(lastLoginMs)) continue;
-      const idleDays = Math.floor((now - lastLoginMs) / MS_IN_DAY);
-      if (admin.isRestricted === true || admin.status === 'restricted') continue;
-      if (idleDays >= INACTIVE_AFTER_DAYS && admin.status === 'active') {
-        try {
-          await updateDoc(doc(db, "accounts", admin.id), {
-            status: "inactive",
-            autoInactive: true,
-            autoInactiveAt: new Date()
-          });
-        } catch (error) {
-          console.error(`Failed to auto-inactivate ${admin.username}:`, error);
-        }
+  const now = Date.now();
+  for (const admin of admins) {
+    const lastLoginMs = admin?.lastLogin?.seconds
+      ? admin.lastLogin.seconds * 1000
+      : (admin?.lastLogin ? new Date(admin.lastLogin).getTime() : NaN);
+    if (!Number.isFinite(lastLoginMs)) continue;
+
+    const idleDays = Math.floor((now - lastLoginMs) / MS_IN_DAY);
+
+    // After 7 days of no login, force status to inactive and clear restriction flags.
+    if (idleDays >= INACTIVE_AFTER_DAYS && admin.status !== 'inactive') {
+      try {
+        await updateDoc(doc(db, "accounts", admin.id), {
+          status: "inactive",
+          isRestricted: false,         // ensure table won't show 'Restricted'
+          restrictedAt: null,          // clear any previous restriction marker
+          autoInactive: true,
+          autoInactiveAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (error) {
+        console.error(`Failed to auto-inactivate ${admin.username}:`, error);
       }
     }
-  }, [admins]);
+  }
+}, [admins]);
 
   useEffect(() => {
     if (!loading) checkInactiveAdmins();
@@ -147,21 +150,92 @@ const AdminManagement = () => {
   const getTimestampMs = (ts) => {
     if (!ts) return 0;
     if (typeof ts === 'number') return ts;
-    if (ts.toMillis) return ts.toMillis();
-    if (ts.toDate) return ts.toDate().getTime();
+    if (ts?.toMillis) return ts.toMillis();
+    if (ts?.toDate) return ts.toDate().getTime();
     if (ts instanceof Date) return ts.getTime();
-    return 0;
+    const parsed = Date.parse(ts);
+    return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const filteredAdmins = admins.filter(
+  const isWithinPreset = (ms, preset) => {
+    if (!ms) return false;
+    const d = new Date(ms);
+    const now = new Date();
+
+    const startOfDay = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const endOfDay = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59, 999);
+
+    const startOfWeek = (dt) => {
+      const day = dt.getDay();
+      const monday = new Date(dt);
+      monday.setHours(0,0,0,0);
+      monday.setDate(dt.getDate() - ((day + 6) % 7));
+      return monday;
+    };
+    const endOfWeek = (dt) => {
+      const monday = startOfWeek(dt);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return endOfDay(sunday);
+    };
+
+    const startOfMonth = (dt) => new Date(dt.getFullYear(), dt.getMonth(), 1);
+    const endOfMonth = (dt) => new Date(dt.getFullYear(), dt.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const startOfLastMonth = (dt) => new Date(dt.getFullYear(), dt.getMonth() - 1, 1);
+    const endOfLastMonth = (dt) => new Date(dt.getFullYear(), dt.getMonth(), 0, 23, 59, 59, 999);
+
+    const startOfYear = (dt) => new Date(dt.getFullYear(), 0, 1);
+    const endOfYear = (dt) => new Date(dt.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+    const between = (x, a, b) => x >= a.getTime() && x <= b.getTime();
+
+    switch (preset) {
+      case 'today':      return between(ms, startOfDay(now), endOfDay(now));
+      case 'this_week':  return between(ms, startOfWeek(now), endOfWeek(now));
+      case 'this_month': return between(ms, startOfMonth(now), endOfMonth(now));
+      case 'last_month': return between(ms, startOfLastMonth(now), endOfLastMonth(now));
+      case 'this_year':  return between(ms, startOfYear(now), endOfYear(now));
+      case 'last_7':     return (Date.now() - ms) <= 7  * MS_IN_DAY;
+      case 'last_14':    return (Date.now() - ms) <= 14 * MS_IN_DAY;
+      case 'last_30':    return (Date.now() - ms) <= 30 * MS_IN_DAY;
+      default:           return true;
+    }
+  };
+
+  const filteredBySearch = admins.filter(
     (a) =>
       (a.fullname || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.username || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Apply sorting
-  const sortedAdmins = [...filteredAdmins].sort((a, b) => {
+  const filteredByFilters = filteredBySearch.filter((a) => {
+    if (filters.role && (a.role || '').toUpperCase() !== filters.role.toUpperCase()) return false;
+
+    if (filters.status) {
+      const status = (a.status || '').toLowerCase();
+      if (status !== filters.status.toLowerCase()) return false;
+    }
+
+    if (filters.createdRange) {
+      const createdMs = getTimestampMs(a.createdAt);
+      if (!createdMs || !isWithinPreset(createdMs, filters.createdRange)) return false;
+    }
+
+    if (filters.lastLoginRange) {
+      if (filters.lastLoginRange === 'never') {
+        if (getTimestampMs(a.lastLogin)) return false;
+      } else {
+        const lastLoginMs = getTimestampMs(a.lastLogin);
+        if (!lastLoginMs || !isWithinPreset(lastLoginMs, filters.lastLoginRange)) return false;
+      }
+    }
+
+    return true;
+  });
+
+  const sortedAdmins = [...filteredByFilters].sort((a, b) => {
     switch (sortBy) {
       case 'name-asc':
         return (a.fullname || a.username || '').localeCompare(b.fullname || b.username || '');
@@ -239,7 +313,6 @@ const AdminManagement = () => {
 
   const handleEdit = (admin) => { setEditAdmin(admin); setIsModalOpen(true); };
 
-  // Delete blocked for self or has activity; Restrict blocked only for self
   const handleDelete = async (id) => {
     if (id === currentUser.id || activityByUserId[id]) return;
     const target = admins.find(a => a.id === id);
@@ -283,7 +356,6 @@ const AdminManagement = () => {
   };
 
   const handleToggleRestriction = async (id, nextActive, targetRow) => {
-    // only block restricting yourself
     if (id === currentUser.id && !nextActive) return;
 
     if (!nextActive) {

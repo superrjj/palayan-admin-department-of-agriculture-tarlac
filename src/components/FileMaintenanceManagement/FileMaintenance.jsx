@@ -1,29 +1,40 @@
+// src/components/FileMaintenance/FileMaintenance.jsx
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { Plus, Trash2, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 
 const ENUM_DOC_COLL = "maintenance";
 const ENUM_DOC_ID = "rice_varieties_enums";
-
-// Accounts enums doc (new) for security questions
 const ACCOUNTS_ENUM_DOC_ID = "accounts_enums";
 
 const FileMaintenance = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Server data (reference)
   const [data, setData] = useState({
     seasons: [],
     plantingMethods: [],
     environments: [],
     yearReleases: []
   });
+
+  // Draft (user edits live here only; not saved until Save Changes)
+  const [draft, setDraft] = useState({
+    seasons: [],
+    plantingMethods: [],
+    environments: [],
+    yearReleases: []
+  });
+
   const [inputs, setInputs] = useState({
     seasons: "",
     plantingMethods: "",
     environments: "",
     yearReleases: ""
   });
+
   const [toast, setToast] = useState(null); // {ok,msg}
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null); // {key,value}
@@ -34,16 +45,30 @@ const FileMaintenance = () => {
     yearReleases: false
   });
 
-  // NEW: selector state
+  // Active module selector
   const [activeModule, setActiveModule] = useState(null); // 'variety' | 'pest' | 'disease' | 'accounts' | null
 
-  // Accounts: security questions state
+  // Accounts enums (security questions)
   const [accLoading, setAccLoading] = useState(false);
-  const [securityQuestions, setSecurityQuestions] = useState([]);
+  const [securityQuestions, setSecurityQuestions] = useState([]); // server
+  const [sqDraft, setSqDraft] = useState([]); // draft
   const [sqInput, setSqInput] = useState("");
   const [confirmOpenAcc, setConfirmOpenAcc] = useState(false);
   const [confirmTargetAcc, setConfirmTargetAcc] = useState(null); // {value}
 
+  // Dirty state and navigation guard
+  const [isDirty, setIsDirty] = useState(false);
+  const [switchGuard, setSwitchGuard] = useState({ open: false, next: null });
+
+  const markDirty = () => setIsDirty(true);
+
+  // Toast helper
+  const showToast = (ok, msg) => {
+    setToast({ ok, msg });
+    setTimeout(() => setToast(null), 1800);
+  };
+
+  // Load and listen (Variety enums)
   useEffect(() => {
     const ref = doc(db, ENUM_DOC_COLL, ENUM_DOC_ID);
 
@@ -69,34 +94,38 @@ const FileMaintenance = () => {
           ref,
           (s) => {
             const d = s.data() || {};
-            setData({
+            const nextData = {
               seasons: d.seasons || [],
               plantingMethods: d.plantingMethods || [],
               environments: d.environments || [],
               yearReleases: d.yearReleases || []
-            });
+            };
+            setData(nextData);
+            setDraft(nextData); // sync draft with server
+            setIsDirty(false);
             setLoading(false);
           },
           (e) => {
             console.error("onSnapshot error:", e);
-            setToast({ ok: false, msg: e?.message || "Failed to load data." });
+            showToast(false, e?.message || "Failed to load data.");
             setLoading(false);
           }
         );
         return unsub;
       } catch (e) {
         console.error("Init error:", e);
-        setToast({ ok: false, msg: e?.message || "Initialization failed." });
+        showToast(false, e?.message || "Initialization failed.");
         setLoading(false);
+        return undefined;
       }
     };
 
     let unsubFn;
     initAndListen().then((u) => (unsubFn = u));
-    return () => unsubFn && unsubFn();
+    return () => { if (unsubFn) unsubFn(); };
   }, []);
 
-  // Initialize Accounts -> Security Questions when that module is opened
+  // Load Accounts enums when opening module
   useEffect(() => {
     if (activeModule !== 'accounts') return;
     let unsub;
@@ -126,18 +155,21 @@ const FileMaintenance = () => {
           ref,
           (s) => {
             const d = s.data() || {};
-            setSecurityQuestions(d.securityQuestions || []);
+            const questions = d.securityQuestions || [];
+            setSecurityQuestions(questions);
+            setSqDraft(questions); // sync draft with server
+            setIsDirty(false);
             setAccLoading(false);
           },
           (e) => {
             console.error("accounts onSnapshot error:", e);
-            setToast({ ok: false, msg: e?.message || "Failed to load security questions." });
+            showToast(false, e?.message || "Failed to load security questions.");
             setAccLoading(false);
           }
         );
       } catch (e) {
         console.error("accounts init error:", e);
-        setToast({ ok: false, msg: e?.message || "Initialization failed." });
+        showToast(false, e?.message || "Initialization failed.");
         setAccLoading(false);
       }
     };
@@ -146,30 +178,48 @@ const FileMaintenance = () => {
     return () => { if (unsub) unsub(); };
   }, [activeModule]);
 
-  const showToast = (ok, msg) => {
-    setToast({ ok, msg });
-    setTimeout(() => setToast(null), 1800);
-  };
+  // Warn on page close with unsaved changes
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
-  const addItem = async (keyName) => {
+  // Module switching guard
+  const requestSwitchModule = (nextId) => {
+    if (isDirty) setSwitchGuard({ open: true, next: nextId });
+    else setActiveModule(nextId);
+  };
+  const discardChanges = () => {
+    setDraft({
+      seasons: data.seasons || [],
+      plantingMethods: data.plantingMethods || [],
+      environments: data.environments || [],
+      yearReleases: data.yearReleases || []
+    });
+    setSqDraft(securityQuestions || []);
+    setIsDirty(false);
+    setActiveModule(switchGuard.next);
+    setSwitchGuard({ open: false, next: null });
+  };
+  const cancelSwitch = () => setSwitchGuard({ open: false, next: null });
+
+  // VARIETY: add/remove in draft only
+  const addItem = (keyName) => {
     const val = (inputs[keyName] || "").trim();
     if (!val) return;
-    if ((data[keyName] || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
+    if ((draft[keyName] || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
       showToast(false, "Already exists.");
       return;
     }
-    try {
-      const ref = doc(db, ENUM_DOC_COLL, ENUM_DOC_ID);
-      await updateDoc(ref, {
-        [keyName]: arrayUnion(val),
-        updatedAt: serverTimestamp()
-      });
-      setInputs((prev) => ({ ...prev, [keyName]: "" }));
-      showToast(true, "Added.");
-    } catch (e) {
-      console.error("Add failed:", e);
-      showToast(false, e?.message || "Add failed.");
-    }
+    setDraft((prev) => ({ ...prev, [keyName]: [...(prev[keyName] || []), val] }));
+    setInputs((prev) => ({ ...prev, [keyName]: "" }));
+    markDirty();
+    showToast(true, "Added (not saved).");
   };
 
   const askRemove = (keyName, value) => {
@@ -177,24 +227,17 @@ const FileMaintenance = () => {
     setConfirmOpen(true);
   };
 
-  const doRemove = async () => {
+  const doRemove = () => {
     const { key, value } = confirmTarget || {};
     if (!key) return;
-    try {
-      const ref = doc(db, ENUM_DOC_COLL, ENUM_DOC_ID);
-      await updateDoc(ref, {
-        [key]: arrayRemove(value),
-        updatedAt: serverTimestamp()
-      });
-      setConfirmOpen(false);
-      setConfirmTarget(null);
-      showToast(true, "Removed.");
-    } catch (e) {
-      console.error("Remove failed:", e);
-      showToast(false, e?.message || "Remove failed.");
-    }
+    setDraft((prev) => ({ ...prev, [key]: (prev[key] || []).filter((v) => v !== value) }));
+    setConfirmOpen(false);
+    setConfirmTarget(null);
+    markDirty();
+    showToast(true, "Removed (not saved).");
   };
 
+  // VARIETY: Save from draft to Firebase
   const saveAll = async () => {
     setSaving(true);
     try {
@@ -204,14 +247,15 @@ const FileMaintenance = () => {
       await setDoc(
         ref,
         {
-          seasons: sanitize(data.seasons),
-          plantingMethods: sanitize(data.plantingMethods),
-          environments: sanitize(data.environments),
-          yearReleases: sanitize(data.yearReleases),
+          seasons: sanitize(draft.seasons),
+          plantingMethods: sanitize(draft.plantingMethods),
+          environments: sanitize(draft.environments),
+          yearReleases: sanitize(draft.yearReleases),
           updatedAt: serverTimestamp()
         },
         { merge: true }
       );
+      setIsDirty(false);
       showToast(true, "Saved.");
     } catch (e) {
       console.error("Save failed:", e);
@@ -221,26 +265,18 @@ const FileMaintenance = () => {
     }
   };
 
-  // Accounts: add/remove security question
-  const addSecurityQuestion = async () => {
+  // ACCOUNTS: draft add/remove, then save
+  const addSecurityQuestion = () => {
     const val = (sqInput || "").trim();
     if (!val) return;
-    if ((securityQuestions || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
+    if ((sqDraft || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
       showToast(false, "Already exists.");
       return;
     }
-    try {
-      const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
-      await updateDoc(ref, {
-        securityQuestions: arrayUnion(val),
-        updatedAt: serverTimestamp()
-      });
-      setSqInput("");
-      showToast(true, "Added.");
-    } catch (e) {
-      console.error("Add question failed:", e);
-      showToast(false, e?.message || "Add failed.");
-    }
+    setSqDraft((prev) => [...prev, val]);
+    setSqInput("");
+    markDirty();
+    showToast(true, "Added (not saved).");
   };
 
   const askRemoveSecurityQuestion = (value) => {
@@ -248,28 +284,33 @@ const FileMaintenance = () => {
     setConfirmOpenAcc(true);
   };
 
-  const doRemoveSecurityQuestion = async () => {
+  const doRemoveSecurityQuestion = () => {
     const value = confirmTargetAcc?.value;
     if (!value) return;
+    setSqDraft((prev) => prev.filter((v) => v !== value));
+    setConfirmOpenAcc(false);
+    setConfirmTargetAcc(null);
+    markDirty();
+    showToast(true, "Removed (not saved).");
+  };
+
+  const saveAccounts = async () => {
     try {
       const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
-      await updateDoc(ref, {
-        securityQuestions: arrayRemove(value),
-        updatedAt: serverTimestamp()
-      });
-      setConfirmOpenAcc(false);
-      setConfirmTargetAcc(null);
-      showToast(true, "Removed.");
+      const sanitize = (arr) => Array.from(new Set((arr || []).map((v) => String(v).trim()).filter(Boolean)));
+      await setDoc(ref, { securityQuestions: sanitize(sqDraft), updatedAt: serverTimestamp() }, { merge: true });
+      setIsDirty(false);
+      showToast(true, "Saved.");
     } catch (e) {
-      console.error("Remove question failed:", e);
-      showToast(false, e?.message || "Remove failed.");
+      console.error("Accounts save failed:", e);
+      showToast(false, e?.message || "Save failed.");
     }
   };
 
-  // Card renderer with "view more"
+  // Variation card with "view more" using draft
   const section = (title, keyName, placeholder) => {
     const limit = 5;
-    const list = data[keyName] || [];
+    const list = draft[keyName] || [];
     const isExpanded = expanded[keyName];
     const visible = isExpanded ? list : list.slice(0, limit);
     const remaining = Math.max(0, list.length - limit);
@@ -331,7 +372,7 @@ const FileMaintenance = () => {
     );
   };
 
-  // Accounts section renderer
+  // Accounts section (uses sqDraft)
   const accountsSection = (
     <div className="bg-white rounded-lg shadow p-4">
       <div className="flex items-center justify-between mb-3">
@@ -356,9 +397,9 @@ const FileMaintenance = () => {
         <div className="text-gray-600 flex items-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
         </div>
-      ) : securityQuestions.length ? (
+      ) : sqDraft.length ? (
         <ul className="divide-y divide-gray-200 min-h-[140px]">
-          {securityQuestions.map((q) => (
+          {sqDraft.map((q) => (
             <li key={`sq-${q}`} className="flex items-center justify-between py-2">
               <span className="text-sm">{q}</span>
               <button
@@ -388,7 +429,7 @@ const FileMaintenance = () => {
       ].map((m) => (
         <button
           key={m.id}
-          onClick={() => setActiveModule(m.id)}
+          onClick={() => requestSwitchModule(m.id)}
           className="text-left bg-white rounded-lg shadow p-5 hover:shadow-md transition border border-transparent hover:border-green-200"
         >
           <div className="text-lg font-semibold">{m.label}</div>
@@ -398,7 +439,7 @@ const FileMaintenance = () => {
     </div>
   );
 
-  // Content for each module
+  // Content per module
   const renderModule = () => {
     if (activeModule === 'variety') {
       return (
@@ -406,7 +447,7 @@ const FileMaintenance = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => requestSwitchModule(null)}
                 className="px-3 py-2 border rounded-lg hover:bg-gray-50"
               >
                 ← Back
@@ -419,8 +460,9 @@ const FileMaintenance = () => {
             <div className="flex gap-2">
               <button
                 onClick={saveAll}
-                disabled={saving || loading}
+                disabled={saving || loading || !isDirty}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+                title={!isDirty ? 'No changes to save' : 'Save Changes'}
               >
                 <Save className="w-4 h-4" />
                 {saving ? "Saving..." : "Save Changes"}
@@ -456,7 +498,7 @@ const FileMaintenance = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => requestSwitchModule(null)}
                 className="px-3 py-2 border rounded-lg hover:bg-gray-50"
               >
                 ← Back
@@ -465,6 +507,22 @@ const FileMaintenance = () => {
                 <h2 className="text-xl font-semibold">Accounts</h2>
                 <p className="text-gray-600 text-sm">Manage account-related lists</p>
               </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={saveAccounts}
+                disabled={saving || !isDirty}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+                title={!isDirty ? 'No changes to save' : 'Save Changes'}
+              >
+                <Save className="w-4 h-4" /> Save Changes
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Reload
+              </button>
             </div>
           </div>
 
@@ -476,16 +534,13 @@ const FileMaintenance = () => {
     }
 
     if (activeModule === 'pest' || activeModule === 'disease') {
-      const titles = {
-        pest: "Pest",
-        disease: "Rice Disease"
-      };
+      const titles = { pest: "Pest", disease: "Rice Disease" };
       return (
         <>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setActiveModule(null)}
+                onClick={() => requestSwitchModule(null)}
                 className="px-3 py-2 border rounded-lg hover:bg-gray-50"
               >
                 ← Back
@@ -512,10 +567,6 @@ const FileMaintenance = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">File Maintenance</h1>
-        <p className="text-gray-600">Manage application</p>
-      </div>
 
       {renderModule()}
 
@@ -531,7 +582,7 @@ const FileMaintenance = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2 text-red-600">Confirm Remove</h4>
             <p className="text-sm text-gray-700">
-              Remove “{confirmTarget?.value}” from {confirmTarget?.key}? This will affect forms using these options.
+              Remove “{confirmTarget?.value}” from {confirmTarget?.key}? This will be removed from the draft. Save Changes to persist.
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpen(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
@@ -546,11 +597,26 @@ const FileMaintenance = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2 text-red-600">Confirm Remove</h4>
             <p className="text-sm text-gray-700">
-              Remove “{confirmTargetAcc?.value}” from Security Questions? This will affect Forgot Password verification.
+              Remove “{confirmTargetAcc?.value}” from Security Questions draft? Save Changes to persist.
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpenAcc(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
               <button onClick={doRemoveSecurityQuestion} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {switchGuard.open && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
+            <h4 className="text-lg font-semibold mb-2 text-amber-600">Discard changes?</h4>
+            <p className="text-sm text-gray-700">
+              You have unsaved changes. If you continue, your edits will be discarded.
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={cancelSwitch} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Stay</button>
+              <button onClick={discardChanges} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Discard</button>
             </div>
           </div>
         </div>

@@ -52,8 +52,6 @@ const PestHeader = ({
 
   return (
     <>
-  
-
       {/* Controls */}
       <div className="bg-white rounded-xl shadow-lg p-4 lg:p-6 mb-6 lg:mb-8 border border-gray-100">
         {/* Search and Actions Row */}
