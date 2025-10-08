@@ -34,23 +34,6 @@ const HistoryHeader = ({
 
   return (
     <>
-      {/* Header */}
-      <div className="bg-white shadow-lg border-b border-gray-200 rounded-t-xl mb-6">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center py-6 space-y-4 lg:space-y-0">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-r from-blue-600 to-indigo-500 rounded-lg">
-                <History className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">History</h1>
-                <p className="text-gray-600 text-sm lg:text-base">View system activity history</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-lg p-4 lg:p-6 mb-6 lg:mb-8 border border-gray-100">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">

@@ -23,6 +23,17 @@ const PestManagement = () => {
   // eslint-disable-next-line no-unused-vars
   const [saveAction, setSaveAction] = useState('');
 
+  // NEW: sorting and filters for header
+  const [sortBy, setSortBy] = useState('');
+  const [filters, setFilters] = useState({
+    yearRange: '',
+    season: '',
+    plantingMethod: '',
+    environment: '',
+    location: '',
+    recommendedInTarlac: '',
+  });
+
   // NEW: Confirm Delete (type pest name)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null); // { id, name }
@@ -85,15 +96,47 @@ const PestManagement = () => {
     return () => unsub();
   }, []);
 
-  const filteredPests = pests.filter(p =>
-    (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getTimestampMs = (ts) => {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.toDate) return ts.toDate().getTime();
+    if (ts instanceof Date) return ts.getTime();
+    return 0;
+  };
+
+  const filteredPests = pests
+    .filter(p =>
+      (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+  // Apply sorting based on sortBy
+  const sortedPests = [...filteredPests].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc':
+        return (a.name || '').localeCompare(b.name || '');
+      case 'name-desc':
+        return (b.name || '').localeCompare(a.name || '');
+      case 'recent': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return bMs - aMs;
+      }
+      case 'oldest': {
+        const aMs = getTimestampMs(a.createdAt);
+        const bMs = getTimestampMs(b.createdAt);
+        return aMs - bMs;
+      }
+      default:
+        return 0;
+    }
+  });
 
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedPests = filteredPests.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedPests = sortedPests.slice(startIndex, startIndex + itemsPerPage);
   // eslint-disable-next-line no-unused-vars
-  const totalPages = Math.ceil(filteredPests.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedPests.length / itemsPerPage);
 
   const handleAddNew = () => {
     setEditPest(null);
@@ -235,6 +278,10 @@ const PestManagement = () => {
         onAddNew={handleAddNew}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        filters={filters}
+        setFilters={setFilters}
       />
 
       {loading ? (

@@ -62,7 +62,7 @@ const RiceVarietyHeader = ({
               <button
                 type="button"
                 onClick={() => setShowSort(v => !v)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
+                className="px-6 py-3 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
               >
                 <ArrowUpDown className="w-4 h-4 text-gray-500" />
                 <span>{getSortLabel(sortBy)}</span>
@@ -106,7 +106,7 @@ const RiceVarietyHeader = ({
             <button
               type="button"
               onClick={() => setShowFilters(v => !v)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+              className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                 showFilters 
                   ? 'bg-green-600 text-white border border-green-600' 
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -119,10 +119,10 @@ const RiceVarietyHeader = ({
             {/* Add New Button */}
             <button
               onClick={onAddNew}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-lg flex items-center justify-center space-x-2 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm font-medium"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-all duration-200 transform hover:scale-105 shadow-lg text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              <span>Add New</span>
+              <span>Add New Variety</span>
             </button>
           </div>
         </div>
