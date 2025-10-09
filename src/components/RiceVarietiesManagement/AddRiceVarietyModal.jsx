@@ -162,7 +162,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl relative">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl relative">
         <div className="p-5 border-b flex items-center justify-between">
           <h2 className="text-xl md:text-2xl font-semibold">

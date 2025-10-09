@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import RiceVarietyHeader from '../RiceVarietiesManagement/RiceVarietyHeader';
 import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';
@@ -44,6 +44,17 @@ const RiceVarietiesManagement = () => {
     setToast({ ok, msg });
     window.clearTimeout(showToast._t);
     showToast._t = window.setTimeout(() => setToast(null), ms);
+  };
+
+  // Modal close handlers
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditVariety(null);
+  };
+
+  // Simple backdrop click handler
+  const handleBackdropClick = () => {
+    handleModalClose();
   };
 
   // Get current user
@@ -221,8 +232,7 @@ const RiceVarietiesManagement = () => {
         });
         showToast(true, "New rice variety added successfully");
       }
-      setIsModalOpen(false);
-      setEditVariety(null);
+      handleModalClose();
     } catch (error) {
       console.error("Error saving rice variety:", error);
       showToast(false, "Error saving rice variety: " + error.message, 2600);
@@ -304,11 +314,18 @@ const RiceVarietiesManagement = () => {
       />
 
       {isModalOpen && (
-        <AddRiceVarietyModal
-          onClose={() => { setIsModalOpen(false); setEditVariety(null); }}
-          onSave={handleAddOrEditVariety}
-          varietyData={editVariety}
-        />
+        <div
+          onClick={handleBackdropClick}
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <AddRiceVarietyModal
+              onClose={handleModalClose}
+              onSave={handleAddOrEditVariety}
+              varietyData={editVariety}
+            />
+          </div>
+        </div>
       )}
 
       {confirmOpen && (
