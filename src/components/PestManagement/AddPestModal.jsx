@@ -121,7 +121,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]">
+    <div className="bg-white rounded-2xl shadow-xl w-[28rem] relative flex flex-col max-h-[90vh]">
       {/* Fixed Header */}
       <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
         <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
@@ -138,7 +138,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-5">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form id="pest-form" onSubmit={handleSubmit} className="space-y-3">
           {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
             const Icon = fieldIcons[field];
             const label =

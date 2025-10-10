@@ -3,7 +3,7 @@ import PestHeader from './PestHeader';
 import AddPestModal from './AddPestModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
-import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
+import { Eye, Edit, Trash, X, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 
 const PestManagement = () => {
   const [pests, setPests] = useState([]);
@@ -14,14 +14,6 @@ const PestManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editPest, setEditPest] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // eslint-disable-next-line no-unused-vars
-  const [successSave, setSuccessSave] = useState(false);
-
-  const [successDelete, setSuccessDelete] = useState(false);
-
-  // eslint-disable-next-line no-unused-vars
-  const [saveAction, setSaveAction] = useState('');
 
   // NEW: sorting and filters for header
   const [sortBy, setSortBy] = useState('name-asc');
@@ -54,6 +46,14 @@ const PestManagement = () => {
     username: 'system',
     email: 'system@example.com'
   });
+
+  // Toast
+  const [toast, setToast] = useState(null); // { ok: boolean, msg: string }
+  const showToast = (ok, msg, ms = 1800) => {
+    setToast({ ok, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), ms);
+  };
 
   const itemsPerPage = 50;
 
@@ -186,7 +186,7 @@ const PestManagement = () => {
           changes: { before, after: { id, ...next } }
         });
 
-        setSaveAction('updated');
+        showToast(true, "Pest updated successfully");
       } else {
         const next = { ...dataToSave, isDeleted: false, createdAt: new Date() };
         const docRef = await addDoc(collection(db, "rice_local_pests"), next);
@@ -204,15 +204,14 @@ const PestManagement = () => {
           changes: { before: null, after: { id: docRef.id, ...next } }
         });
 
-        setSaveAction('added');
+        showToast(true, "Pest added successfully");
       }
 
       setIsModalOpen(false);
       setEditPest(null);
-      setSuccessSave(true);
-      setTimeout(() => setSuccessSave(false), 2000);
     } catch (error) {
-      alert("Error saving rice pest: " + error.message);
+      console.error("Error saving rice pest:", error);
+      showToast(false, "Error saving rice pest: " + error.message, 2600);
     }
   };
 
@@ -265,10 +264,10 @@ const PestManagement = () => {
       setConfirmOpen(false);
       setConfirmTarget(null);
       setConfirmInput('');
-      setSuccessDelete(true);
-      setTimeout(() => setSuccessDelete(false), 1000);
+      showToast(true, "Pest removed successfully");
     } catch (error) {
-      alert("Error deleting rice pest: " + error.message);
+      console.error("Error deleting rice pest:", error);
+      showToast(false, "Error deleting rice pest: " + error.message, 2600);
       setConfirmBusy(false);
     }
   };
@@ -370,9 +369,9 @@ const PestManagement = () => {
       {isModalOpen && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onMouseDown={closePestModal}
+          onClick={closePestModal}
         >
-          <div onMouseDown={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <AddPestModal
               onClose={closePestModal}
               onSave={handleAddOrEditPest}
@@ -385,56 +384,73 @@ const PestManagement = () => {
       {confirmOpen && confirmTarget && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onMouseDown={() => { if (!confirmBusy) cancelDelete(); }}
+          onClick={() => { if (!confirmBusy) cancelDelete(); }}
         >
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash className="w-8 h-8 text-red-600" />
-              </div>
-              <h3 className="mt-3 text-lg font-semibold text-gray-800">Delete Pest</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                This action cannot be undone. To confirm, type the pest name exactly:
-              </p>
-              <div className="mt-2 p-3 bg-gray-50 rounded border text-sm text-gray-800 w-full">
-                {confirmTarget.name}
-              </div>
-
-              <input
-                className="mt-3 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                placeholder="Type the pest name exactly to confirm"
-                value={confirmInput}
-                onChange={(e) => setConfirmInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && canConfirmDelete && !confirmBusy) confirmDeleteNow();
-                }}
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Fixed Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+                Delete Pest
+              </h2>
+              <button
+                onClick={cancelDelete}
+                className="text-gray-400 hover:text-red-500 transition"
                 disabled={confirmBusy}
-                autoFocus
-              />
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {!canConfirmDelete && confirmInput.length > 0 && (
-                <div className="text-xs text-red-600 mt-1 w-full text-left">The text does not match.</div>
-              )}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <Trash className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Confirm Deletion</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  This action cannot be undone. To confirm, type the pest name exactly:
+                </p>
+                <div className="w-full p-3 bg-gray-50 rounded border text-sm text-gray-800 mb-3">
+                  {confirmTarget.name}
+                </div>
 
-              <div className="mt-4 w-full flex justify-end gap-2">
-                <button
-                  onClick={cancelDelete}
-                  className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
+                <input
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  placeholder="Type the pest name exactly to confirm"
+                  value={confirmInput}
+                  onChange={(e) => setConfirmInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && canConfirmDelete && !confirmBusy) confirmDeleteNow();
+                  }}
                   disabled={confirmBusy}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteNow}
-                  disabled={!canConfirmDelete || confirmBusy}
-                  className={`px-3 py-2 rounded-md text-white text-sm flex items-center gap-2 ${
-                    canConfirmDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'
-                  }`}
-                >
-                  <Trash className="w-4 h-4" />
-                  {confirmBusy ? 'Deleting...' : 'Delete'}
-                </button>
+                />
+
+                {!canConfirmDelete && confirmInput.length > 0 && (
+                  <div className="text-xs text-red-600 mt-2 w-full text-left">The text does not match.</div>
+                )}
               </div>
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={cancelDelete}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                disabled={confirmBusy}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteNow}
+                disabled={!canConfirmDelete || confirmBusy}
+                className={`px-4 py-1.5 rounded-lg text-white font-medium shadow-md transition disabled:opacity-50 flex items-center gap-2 ${
+                  canConfirmDelete ? 'bg-gradient-to-r from-red-600 to-red-500 hover:opacity-90' : 'bg-red-400 cursor-not-allowed'
+                }`}
+              >
+                <Trash className="w-4 h-4" />
+                {confirmBusy ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
@@ -442,93 +458,129 @@ const PestManagement = () => {
 
       {viewPest && (
         <div
-          className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50"
-          onMouseDown={() => setViewPest(null)}
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setViewPest(null)}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setViewPest(null)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"
-            >
-              <X className="w-5 h-5 text-gray-600" />
-            </button>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Fixed Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+                View Pest Details
+              </h2>
+              <button
+                onClick={() => setViewPest(null)}
+                className="text-gray-400 hover:text-red-500 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <h2 className="text-2xl font-bold mb-4">{viewPest.name || "Unnamed Pest"}</h2>
-
-            {viewPest.mainImageUrl && (
-              <img
-                src={viewPest.mainImageUrl}
-                alt={viewPest.name}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
-            )}
-
-            <div className="space-y-3 text-gray-700">
-              {viewPest.scientificName && <p><strong>Scientific Name:</strong> {viewPest.scientificName}</p>}
-              {viewPest.description && (
-                <p>
-                  <strong>Description:</strong>
-                  <span className="block mt-1" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto' }}>
-                    {viewPest.description}
-                  </span>
-                </p>
-              )}
-              {viewPest.cause && (
-                <p>
-                  <strong>Cause:</strong>
-                  <span className="block mt-1" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto' }}>
-                    {viewPest.cause}
-                  </span>
-                </p>
-              )}
-              {viewPest.symptoms && (
-                <p>
-                  <strong>Symptoms:</strong>
-                  <span className="block mt-1" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto' }}>
-                    {viewPest.symptoms}
-                  </span>
-                </p>
-              )}
-              {viewPest.treatments && (
-                <p>
-                  <strong>Treatments:</strong>
-                  <span className="block mt-1" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto' }}>
-                    {viewPest.treatments}
-                  </span>
-                </p>
-              )}
-
-              <div className="flex flex-col text-gray-500 text-sm mt-2 space-y-1">
-                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Created: {viewPest.createdAt?.toDate ? viewPest.createdAt.toDate().toLocaleString() : "-"}</div>
-                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Updated: {viewPest.updatedAt?.toDate ? viewPest.updatedAt.toDate().toLocaleString() : "-"}</div>
-              </div>
-
-              {viewPest.images && viewPest.images.length > 0 && (
-                <div className="mt-3">
-                  <strong>Images:</strong>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {viewPest.images.map((img, idx) => (
-                      <img key={idx} src={img} alt={`img-${idx}`} className="w-full h-24 object-cover rounded" />
-                    ))}
-                  </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{viewPest.name || "Unnamed Pest"}</h3>
+                  {viewPest.scientificName && (
+                    <p className="text-sm italic text-gray-600 mb-3">{viewPest.scientificName}</p>
+                  )}
                 </div>
-              )}
+
+                {viewPest.mainImageUrl && (
+                  <div className="mb-4">
+                    <img
+                      src={viewPest.mainImageUrl}
+                      alt={viewPest.name}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3 text-gray-700">
+                  {viewPest.description && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Description</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewPest.description}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {viewPest.cause && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Cause</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewPest.cause}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {viewPest.symptoms && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Symptoms</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewPest.symptoms}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {viewPest.treatments && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Treatments</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewPest.treatments}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-3 mt-4">
+                    <div className="flex flex-col text-gray-500 text-xs space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3"/>
+                        <span><strong>Created:</strong> {viewPest.createdAt?.toDate ? viewPest.createdAt.toDate().toLocaleString() : "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3"/>
+                        <span><strong>Updated:</strong> {viewPest.updatedAt?.toDate ? viewPest.updatedAt.toDate().toLocaleString() : "-"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewPest.images && viewPest.images.length > 0 && (
+                    <div className="border-t pt-3 mt-4">
+                      <h4 className="font-medium text-gray-800 mb-2">Additional Images</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {viewPest.images.map((img, idx) => (
+                          <img 
+                            key={idx} 
+                            src={img} 
+                            alt={`img-${idx}`} 
+                            className="w-full h-20 object-cover rounded border" 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={() => setViewPest(null)}
+                className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {successDelete && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <svg className="w-16 h-16 text-green-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            <h3 className="text-base font-semibold text-green-600">Pest deleted successfully.</h3>
-          </div>
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow text-white flex items-center gap-2 ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>
+          {toast.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          <span className="text-sm">{toast.msg}</span>
         </div>
       )}
     </div>
