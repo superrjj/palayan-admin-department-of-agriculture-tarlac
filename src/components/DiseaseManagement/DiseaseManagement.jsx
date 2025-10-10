@@ -1,9 +1,10 @@
+// DiseaseManagement.jsx
 import React, { useState, useEffect } from 'react';
 import DiseaseHeader from './DiseaseHeader';
 import AddDiseaseModal from './AddDiseaseModal';
-import { addDoc, collection, onSnapshot, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
-import { Eye, Edit, Trash, X, Calendar } from "lucide-react";
+import { Eye, Edit, Trash, X, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 
 const normalizeAffectedParts = (v) =>
   Array.isArray(v)
@@ -15,34 +16,34 @@ const normalizeAffectedParts = (v) =>
 const DiseaseManagement = () => {
   const [diseases, setDiseases] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  // eslint-disable-next-line no-unused-vars
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editDisease, setEditDisease] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // eslint-disable-next-line no-unused-vars
-  const [successSave, setSuccessSave] = useState(false);
+  // Delete confirm dialog
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { id, name }
+  const [confirmInput, setConfirmInput] = useState('');
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
-  // eslint-disable-next-line no-unused-vars
-  const [successDelete, setSuccessDelete] = useState(false);
-
-  // eslint-disable-next-line no-unused-vars
-  const [saveAction, setSaveAction] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedDisease, setSelectedDisease] = useState(null);
+  // View modal
   const [viewDisease, setViewDisease] = useState(null);
 
-  // NEW: type-to-confirm input state
-  const [confirmText, setConfirmText] = useState('');
+  // Toast (like Pest)
+  const [toast, setToast] = useState(null); // { ok: boolean, msg: string }
+  const showToast = (ok, msg, ms = 1800) => {
+    setToast({ ok, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), ms);
+  };
 
-  // NEW: sorting + filters for header
-  const [sortBy, setSortBy] = useState('name-asc'); 
-
-   useEffect(() => {
-      if (!sortBy) setSortBy('name-asc');
-    }, [sortBy, setSortBy]);
+  // sorting + filters (like Pest)
+  const [sortBy, setSortBy] = useState('name-asc');
+  useEffect(() => {
+    if (!sortBy) setSortBy('name-asc');
+  }, [sortBy, setSortBy]);
 
   const [filters, setFilters] = useState({
     yearRange: '',
@@ -53,7 +54,7 @@ const DiseaseManagement = () => {
     recommendedInTarlac: '',
   });
 
-  // current user for audit logs 
+  // current user (for audit logs)
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
     fullname: 'System User',
@@ -93,19 +94,22 @@ const DiseaseManagement = () => {
     const unsub = onSnapshot(
       collection(db, "rice_local_diseases"),
       snapshot => {
-        const data = snapshot.docs.map(snap => {
-          const d = { id: snap.id, ...snap.data() };
-          return {
-            ...d,
-            affectedParts: normalizeAffectedParts(d.affectedParts),
-          };
-        });
+        const data = snapshot.docs
+          .map(snap => {
+            const d = { id: snap.id, ...snap.data() };
+            return {
+              ...d,
+              affectedParts: normalizeAffectedParts(d.affectedParts),
+            };
+          })
+          .filter(item => item.isDeleted !== true);
         setDiseases(data);
         setLoading(false);
       },
       error => {
         console.error("Error fetching diseases:", error);
         setLoading(false);
+        showToast(false, "Error loading diseases. Please try again.");
       }
     );
     return () => unsub();
@@ -126,7 +130,6 @@ const DiseaseManagement = () => {
     (d.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Apply sorting based on sortBy
   const sortedDiseases = [...filteredDiseases].sort((a, b) => {
     switch (sortBy) {
       case 'name-asc':
@@ -150,12 +153,16 @@ const DiseaseManagement = () => {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedDiseases = sortedDiseases.slice(startIndex, startIndex + itemsPerPage);
-  // eslint-disable-next-line no-unused-vars
   const totalPages = Math.ceil(sortedDiseases.length / itemsPerPage);
 
   const handleAddNew = () => {
     setEditDisease(null);
     setIsModalOpen(true);
+  };
+
+  const closeDiseaseModal = () => {
+    setIsModalOpen(false);
+    setEditDisease(null);
   };
 
   const handleAddOrEditDisease = async (diseaseData, id) => {
@@ -177,8 +184,8 @@ const DiseaseManagement = () => {
         const prevSnap = await getDoc(doc(db, "rice_local_diseases", id));
         const before = prevSnap.exists() ? { id, ...prevSnap.data(), affectedParts: normalizeAffectedParts(prevSnap.data().affectedParts) } : null;
 
-        dataToSave.updatedAt = new Date();
-        await updateDoc(doc(db, "rice_local_diseases", id), dataToSave);
+        const next = { ...dataToSave, isDeleted: false, updatedAt: new Date() };
+        await updateDoc(doc(db, "rice_local_diseases", id), next);
 
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
@@ -190,16 +197,13 @@ const DiseaseManagement = () => {
           documentId: id,
           documentName: dataToSave.name || 'Unnamed Disease',
           description: 'Updated disease record',
-          changes: {
-            before,
-            after: { id, ...dataToSave }
-          }
+          changes: { before, after: { id, ...next } }
         });
 
-        setSaveAction('updated');
+        showToast(true, "Disease updated successfully");
       } else {
-        dataToSave.createdAt = new Date();
-        const docRef = await addDoc(collection(db, "rice_local_diseases"), dataToSave);
+        const next = { ...dataToSave, isDeleted: false, createdAt: new Date() };
+        const docRef = await addDoc(collection(db, "rice_local_diseases"), next);
 
         await addDoc(collection(db, "audit_logs"), {
           userId: currentUser.id,
@@ -211,22 +215,17 @@ const DiseaseManagement = () => {
           documentId: docRef.id,
           documentName: dataToSave.name || 'Unnamed Disease',
           description: 'Added new disease record',
-          changes: {
-            before: null,
-            after: { id: docRef.id, ...dataToSave }
-          }
+          changes: { before: null, after: { id: docRef.id, ...next } }
         });
 
-        setSaveAction('added');
+        showToast(true, "Disease added successfully");
       }
 
       setIsModalOpen(false);
       setEditDisease(null);
-      setSuccessSave(true);
-      setTimeout(() => setSuccessSave(false), 2000);
-
-    } catch (err) {
-      alert(`Failed to save disease: ${err.message}`);
+    } catch (error) {
+      console.error("Error saving disease:", error);
+      showToast(false, "Error saving disease: " + error.message, 2600);
     }
   };
 
@@ -238,16 +237,30 @@ const DiseaseManagement = () => {
     setIsModalOpen(true);
   };
 
-  const performDelete = async (id) => {
+  // Open confirm dialog (type the disease name)
+  const openDeleteModal = (disease) => {
+    setConfirmTarget({ id: disease.id, name: disease.name || 'Unnamed Disease' });
+    setConfirmInput('');
+    setConfirmOpen(true);
+  };
+
+  // Soft delete (like Pest)
+  const confirmDeleteNow = async () => {
+    if (!confirmTarget) return;
+    setConfirmBusy(true);
     try {
-      setSuccessDelete(true);
+      const id = confirmTarget.id;
 
       const before = diseases.find(d => d.id === id) || (await (async () => {
         const snap = await getDoc(doc(db, "rice_local_diseases", id));
         return snap.exists() ? { id, ...snap.data(), affectedParts: normalizeAffectedParts(snap.data().affectedParts) } : null;
       })());
 
-      await deleteDoc(doc(db, "rice_local_diseases", id));
+      await updateDoc(doc(db, "rice_local_diseases", id), {
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: currentUser.id
+      });
 
       await addDoc(collection(db, "audit_logs"), {
         userId: currentUser.id,
@@ -259,40 +272,31 @@ const DiseaseManagement = () => {
         documentId: id,
         documentName: before?.name || 'Unnamed Disease',
         description: 'Deleted disease record',
-        changes: {
-          before,
-          after: null
-        }
+        changes: { before, after: null }
       });
 
-      setTimeout(() => setSuccessDelete(false), 2000);
-    } catch (err) {
-      setSuccessDelete(false);
-      alert(`Failed to delete disease: ${err.message}`);
+      setDiseases(prev => prev.filter(d => d.id !== id));
+
+      setConfirmBusy(false);
+      setConfirmOpen(false);
+      setConfirmTarget(null);
+      setConfirmInput('');
+      showToast(true, "Disease removed successfully");
+    } catch (error) {
+      console.error("Error deleting disease:", error);
+      showToast(false, "Error deleting disease: " + error.message, 2600);
+      setConfirmBusy(false);
     }
   };
 
-  const openDeleteModal = (disease) => {
-    setSelectedDisease({ id: disease.id, name: disease.name || 'Unnamed Disease' });
-    setConfirmText('');
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!selectedDisease) return;
-    await performDelete(selectedDisease.id);
-    setShowDeleteModal(false);
-    setSelectedDisease(null);
-    setConfirmText('');
-  };
-
   const cancelDelete = () => {
-    setShowDeleteModal(false);
-    setSelectedDisease(null);
-    setConfirmText('');
+    if (confirmBusy) return;
+    setConfirmOpen(false);
+    setConfirmTarget(null);
+    setConfirmInput('');
   };
 
-  const isConfirmMatch = (selectedDisease?.name || '') === confirmText;
+  const canConfirmDelete = !!confirmTarget && confirmInput.trim() === (confirmTarget.name || '').trim();
 
   return (
     <div className="p-4 lg:p-6">
@@ -316,261 +320,304 @@ const DiseaseManagement = () => {
             </div>
           ) : (
             paginatedDiseases.map(disease => (
-               <div 
-              key={disease.id} 
-              className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative"
-            >
-              {disease.mainImageUrl && (
-                <img 
-                  src={disease.mainImageUrl} 
-                  alt={disease.name} 
-                  className="w-full h-40 object-cover rounded mb-3"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              )}
-              <h3 className="font-semibold text-lg">{disease.name || 'Unnamed Disease'}</h3>
-              {disease.localName && <p className="text-sm text-gray-700">{disease.localName}</p>}
-              {disease.scientificName && <p className="text-sm italic text-gray-600">{disease.scientificName}</p>}
-              {disease.description && (
-              <p 
-                className="text-gray-600 mt-2 text-sm overflow-hidden"
-                style={{ 
-                  textAlign: 'justify', 
-                  textJustify: 'inter-word',
-                  hyphens: 'auto',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical',
-                  lineHeight: '1.4em',
-                  maxHeight: '4.2em'
-                }}
+              <div
+                key={disease.id}
+                className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative flex flex-col h-full"
               >
-                {disease.description}
-              </p>
-            )}
+                {disease.mainImageUrl && (
+                  <img
+                    src={disease.mainImageUrl}
+                    alt={disease.name}
+                    className="w-full h-40 object-cover rounded mb-3"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+                <h3 className="font-semibold text-lg">{disease.name || 'Unnamed Disease'}</h3>
+                {disease.localName && <p className="text-sm text-gray-700">{disease.localName}</p>}
+                {disease.scientificName && <p className="text-sm italic text-gray-600">{disease.scientificName}</p>}
+                {disease.description && (
+                  <p
+                    className="text-gray-600 mt-2 text-sm overflow-hidden"
+                    style={{
+                      textAlign: 'justify',
+                      textJustify: 'inter-word',
+                      hyphens: 'auto',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: '1.4em',
+                      maxHeight: '4.2em'
+                    }}
+                  >
+                    {disease.description}
+                  </p>
+                )}
 
-              {Array.isArray(disease.affectedParts) && disease.affectedParts.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {disease.affectedParts.map((p, idx) => (
-                    <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {p}
-                    </span>
-                  ))}
+                {Array.isArray(disease.affectedParts) && disease.affectedParts.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {disease.affectedParts.map((p, idx) => (
+                      <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-3 text-xs text-gray-500 space-y-1">
+                  <p><span className="font-medium">Created Date:</span> {disease.createdAt?.toDate ? disease.createdAt.toDate().toLocaleString() : "N/A"}</p>
+                  <p><span className="font-medium">Last Updated:</span> {disease.updatedAt?.toDate ? disease.updatedAt.toDate().toLocaleString() : "-"}</p>
                 </div>
-              )}
 
-              <div className="mt-3 text-xs text-gray-500 space-y-1">
-                <p><span className="font-medium">Created Date:</span> {disease.createdAt?.toDate ? disease.createdAt.toDate().toLocaleString() : "N/A"}</p>
-                <p><span className="font-medium">Last Updated:</span> {disease.updatedAt?.toDate ? disease.updatedAt.toDate().toLocaleString() : "-"}</p>
+                <div className="mt-auto" />
+
+                <div className="flex justify-center gap-2 mt-3">
+                  <button
+                    onClick={() => setViewDisease(disease)}
+                    className="flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition"
+                  >
+                    <Eye className="w-4 h-4" /> View
+                  </button>
+                  <button
+                    onClick={() => handleEdit(disease)}
+                    className="flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
+                  >
+                    <Edit className="w-4 h-4" /> Edit
+                  </button>
+                  <button
+                    onClick={() => openDeleteModal(disease)}
+                    className="flex items-center justify-center gap-1 bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 transition"
+                  >
+                    <Trash className="w-4 h-4" /> Delete
+                  </button>
+                </div>
               </div>
-
-           <div className="flex justify-center gap-2 mt-3">
-            <button
-              onClick={() => setViewDisease(disease)}
-              className="flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition"
-            >
-              <Eye className="w-4 h-4" /> View
-            </button>
-
-            <button
-              onClick={() => handleEdit(disease)}
-              className="flex items-center justify-center gap-1 bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
-            >
-              <Edit className="w-4 h-4" /> Edit
-            </button>
-
-            <button
-              onClick={() => openDeleteModal(disease)}
-              className="flex items-center justify-center gap-1 bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 transition"
-            >
-              <Trash className="w-4 h-4" /> Delete
-            </button>
-          </div>
-
-            </div>
             ))
           )}
         </div>
       )}
 
       {isModalOpen && (
-        <AddDiseaseModal
-          onClose={() => { setIsModalOpen(false); setEditDisease(null); }}
-          onSave={handleAddOrEditDisease}
-          diseaseData={editDisease}
-        />
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={closeDiseaseModal}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <AddDiseaseModal
+              onClose={closeDiseaseModal}
+              onSave={handleAddOrEditDisease}
+              diseaseData={editDisease}
+            />
+          </div>
+        </div>
       )}
 
-      {showDeleteModal && selectedDisease && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash className="w-8 h-8 text-red-600" />
-              </div>
-              <h3 className="mt-3 text-lg font-semibold text-gray-800">Delete Disease</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                This action cannot be undone. To confirm, type the disease name exactly:
-              </p>
-              <p className="mt-2 text-sm">
-                <span className="text-gray-500">Disease name:</span>{' '}
-                <span className="font-semibold text-gray-800">{selectedDisease.name}</span>
-              </p>
+      {confirmOpen && confirmTarget && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => { if (!confirmBusy) cancelDelete(); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Fixed Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+                Delete Disease
+              </h2>
+              <button
+                onClick={cancelDelete}
+                className="text-gray-400 hover:text-red-500 transition"
+                disabled={confirmBusy}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="mt-3 w-full">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <Trash className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Confirm Deletion</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  This action cannot be undone. To confirm, type the disease name exactly:
+                </p>
+                <div className="w-full p-3 bg-gray-50 rounded border text-sm text-gray-800 mb-3">
+                  {confirmTarget.name}
+                </div>
+
                 <input
-                  autoFocus
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  placeholder="Type the disease name exactly to confirm"
+                  value={confirmInput}
+                  onChange={(e) => setConfirmInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && isConfirmMatch) confirmDelete();
+                    if (e.key === 'Enter' && canConfirmDelete && !confirmBusy) confirmDeleteNow();
                   }}
-                  placeholder={`Type "${selectedDisease.name}" to confirm`}
-                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${
-                    isConfirmMatch ? 'border-red-300 focus:ring-red-400' : 'border-gray-300 focus:ring-gray-200'
-                  }`}
+                  disabled={confirmBusy}
                 />
-                {!isConfirmMatch && confirmText.length > 0 && (
-                  <p className="mt-1 text-xs text-red-600">The text does not match the disease name.</p>
+
+                {!canConfirmDelete && confirmInput.length > 0 && (
+                  <div className="text-xs text-red-600 mt-2 w-full text-left">The text does not match.</div>
                 )}
               </div>
+            </div>
 
-              <div className="mt-4 w-full flex justify-end gap-2">
-                <button
-                  onClick={cancelDelete}
-                  className="px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={!isConfirmMatch}
-                  className={`px-3 py-2 rounded-md text-white text-sm flex items-center gap-2 ${
-                    isConfirmMatch ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed opacity-70'
-                  }`}
-                >
-                  <Trash className="w-4 h-4" />
-                  Delete
-                </button>
-              </div>
+            {/* Fixed Footer */}
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={cancelDelete}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                disabled={confirmBusy}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteNow}
+                disabled={!canConfirmDelete || confirmBusy}
+                className={`px-4 py-1.5 rounded-lg text-white font-medium shadow-md transition disabled:opacity-50 flex items-center gap-2 ${
+                  canConfirmDelete ? 'bg-gradient-to-r from-red-600 to-red-500 hover:opacity-90' : 'bg-red-400 cursor-not-allowed'
+                }`}
+              >
+                <Trash className="w-4 h-4" />
+                {confirmBusy ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {viewDisease && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setViewDisease(null)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"
-            >
-              <X className="w-5 h-5 text-gray-600" />
-            </button>
-
-            <h2 className="text-2xl font-bold mb-4">{viewDisease.name || "Unnamed Disease"}</h2>
-            {viewDisease.mainImageUrl && (
-              <img
-                src={viewDisease.mainImageUrl}
-                alt={viewDisease.name}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
-            )}
-
-            <div className="space-y-3 text-gray-700">
-              {viewDisease.localName && <p><strong>Local Name:</strong> {viewDisease.localName}</p>}
-              {viewDisease.scientificName && <p><strong>Scientific Name:</strong> {viewDisease.scientificName}</p>}
-              {viewDisease.description && (
-              <p>
-                <strong>Description:</strong> 
-                <span 
-                  className="block mt-1"
-                  style={{ 
-                    textAlign: 'justify', 
-                    textJustify: 'inter-word',
-                    hyphens: 'auto'
-                  }}
-                >
-                  {viewDisease.description}
-                </span>
-              </p>
-            )}
-            {viewDisease.cause && (
-              <p>
-                <strong>Cause:</strong> 
-                <span 
-                  className="block mt-1"
-                  style={{ 
-                    textAlign: 'justify', 
-                    textJustify: 'inter-word',
-                    hyphens: 'auto'
-                  }}
-                >
-                  {viewDisease.cause}
-                </span>
-              </p>
-            )}
-            {viewDisease.symptoms && (
-              <p>
-                <strong>Symptoms:</strong> 
-                <span 
-                  className="block mt-1"
-                  style={{ 
-                    textAlign: 'justify', 
-                    textJustify: 'inter-word',
-                    hyphens: 'auto'
-                  }}
-                >
-                  {viewDisease.symptoms}
-                </span>
-              </p>
-            )}
-            {viewDisease.treatments && (
-              <p>
-                <strong>Treatments:</strong> 
-                <span 
-                  className="block mt-1"
-                  style={{ 
-                    textAlign: 'justify', 
-                    textJustify: 'inter-word',
-                    hyphens: 'auto'
-                  }}
-                >
-                  {viewDisease.treatments}
-                </span>
-              </p>
-            )}
-
-              {Array.isArray(viewDisease.affectedParts) && viewDisease.affectedParts.length > 0 && (
-                <div>
-                  <strong>Affected Part(s):</strong>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {viewDisease.affectedParts.map((p, idx) => (
-                      <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-col text-gray-500 text-sm mt-2 space-y-1">
-                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Created: {viewDisease.createdAt?.toDate ? viewDisease.createdAt.toDate().toLocaleString() : "-"}</div>
-                <div className="flex items-center gap-2"><Calendar className="w-4 h-4"/> Updated: {viewDisease.updatedAt?.toDate ? viewDisease.updatedAt.toDate().toLocaleString() : "-"}</div>
-              </div>
-
-              {viewDisease.images && viewDisease.images.length > 0 && (
-                <div className="mt-3">
-                  <strong>Images:</strong>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {viewDisease.images.map((img, idx) => (
-                      <img key={idx} src={img} alt={`img-${idx}`} className="w-full h-24 object-cover rounded" />
-                    ))}
-                  </div>
-                </div>
-              )}
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setViewDisease(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Fixed Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+                View Disease Details
+              </h2>
+              <button
+                onClick={() => setViewDisease(null)}
+                className="text-gray-400 hover:text-red-500 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{viewDisease.name || "Unnamed Disease"}</h3>
+                  {viewDisease.localName && (
+                    <p className="text-sm text-gray-700 mb-1"><strong>Local Name:</strong> {viewDisease.localName}</p>
+                  )}
+                  {viewDisease.scientificName && (
+                    <p className="text-sm italic text-gray-600 mb-3">{viewDisease.scientificName}</p>
+                  )}
+                </div>
+
+                {viewDisease.mainImageUrl && (
+                  <div className="mb-4">
+                    <img
+                      src={viewDisease.mainImageUrl}
+                      alt={viewDisease.name}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3 text-gray-700">
+                  {viewDisease.description && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Description</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewDisease.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {viewDisease.cause && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Cause</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewDisease.cause}
+                      </p>
+                    </div>
+                  )}
+
+                  {viewDisease.symptoms && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Symptoms</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewDisease.symptoms}
+                      </p>
+                    </div>
+                  )}
+
+                  {viewDisease.treatments && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Treatments</h4>
+                      <p className="text-sm text-justify leading-relaxed">
+                        {viewDisease.treatments}
+                      </p>
+                    </div>
+                  )}
+
+                  {Array.isArray(viewDisease.affectedParts) && viewDisease.affectedParts.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-1">Affected Part(s)</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {viewDisease.affectedParts.map((p, idx) => (
+                          <span key={`${p}-${idx}`} className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-3 mt-4">
+                    <div className="flex flex-col text-gray-500 text-xs space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3"/>
+                        <span><strong>Created:</strong> {viewDisease.createdAt?.toDate ? viewDisease.createdAt.toDate().toLocaleString() : "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3"/>
+                        <span><strong>Updated:</strong> {viewDisease.updatedAt?.toDate ? viewDisease.updatedAt.toDate().toLocaleString() : "-"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewDisease.images && viewDisease.images.length > 0 && (
+                    <div className="border-t pt-3 mt-4">
+                      <h4 className="font-medium text-gray-800 mb-2">Additional Images</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {viewDisease.images.map((img, idx) => (
+                          <img
+                            key={idx}
+                            src={img}
+                            alt={`img-${idx}`}
+                            className="w-full h-20 object-cover rounded border"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow text-white flex items-center gap-2 ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>
+          {toast.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          <span className="text-sm">{toast.msg}</span>
         </div>
       )}
     </div>

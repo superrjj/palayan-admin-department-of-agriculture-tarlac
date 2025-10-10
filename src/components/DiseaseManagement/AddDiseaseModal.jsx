@@ -1,3 +1,4 @@
+// AddDiseaseModal.jsx
 import React, { useState, useEffect } from "react";
 import { X, UploadCloud, Book, Globe, Info, AlertCircle, Stethoscope, Heart } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -25,7 +26,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [toast, setToast] = useState({ show: false, message: "", type: "error" });
+  const [toast, setToast] = useState(null); // { type: 'error' | 'success', msg: string }
   const isEdit = !!diseaseData;
 
   useEffect(() => {
@@ -43,11 +44,10 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     }));
   }, [diseaseData]);
 
-  const showToast = (message, type = "error") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast({ show: false, message: "", type: "error" });
-    }, 4000);
+  const showToast = (msg, type = 'error', ms = 2200) => {
+    setToast({ type, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), ms);
   };
 
   const handleChange = (e) => {
@@ -67,7 +67,6 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-    
     if (files.length + images.length > 2000) {
       showToast("You can upload a maximum of 2000 images.");
       return;
@@ -92,9 +91,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
             const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
             setUploadProgress(progress);
           },
-          (error) => {
-            reject(error);
-          },
+          (error) => reject(error),
           async () => {
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
@@ -124,7 +121,6 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     }
 
     setUploading(true);
-    
     try {
       let imageUrls = [];
       let mainImageUrl = diseaseData?.mainImageUrl || "";
@@ -143,15 +139,14 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
         symptoms: formData.symptoms.trim(),
         treatments: formData.treatments.trim(),
         affectedParts: Array.isArray(formData.affectedParts) ? formData.affectedParts : normalizeAffectedParts(formData.affectedParts),
-        mainImageUrl: mainImageUrl,
+        mainImageUrl,
         images: imageUrls.length > 0 ? imageUrls : (diseaseData?.images || []),
       };
-      
+
       await onSave(dataToSave, diseaseData?.id);
-      
+
       setImages([]);
       setUploadProgress(0);
-      
     } catch (error) {
       showToast(`Error saving disease: ${error.message}`);
     } finally {
@@ -172,227 +167,222 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const affectedPartOptions = ["Dahon", "Tangkay", "Bunga", "Ugat"];
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-        <div 
-          className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Fixed Header */}
-          <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
-              {isEdit ? "Edit Disease" : "Add New Disease"}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-red-500 transition"
-              disabled={uploading}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-[28rem] relative flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Fixed Header */}
+        <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
+            {isEdit ? "Edit Disease" : "Add New Disease"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-red-500 transition"
+            disabled={uploading}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-5">
-            <form onSubmit={handleSubmit} className="space-y-3" id="disease-form">
-              {["name", "localName", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
-                const Icon = fieldIcons[field];
-                const label =
-                  field === "name" ? "Disease Name" :
-                  field === "localName" ? "Local Name" :
-                  field === "scientificName" ? "Scientific Name" :
-                  field.charAt(0).toUpperCase() + field.slice(1);
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-5">
+          <form onSubmit={handleSubmit} className="space-y-3" id="disease-form">
+            {["name", "localName", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
+              const Icon = fieldIcons[field];
+              const label =
+                field === "name" ? "Disease Name" :
+                field === "localName" ? "Local Name" :
+                field === "scientificName" ? "Scientific Name" :
+                field.charAt(0).toUpperCase() + field.slice(1);
 
-                return (
-                  <div key={field} className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {label} <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500 transition">
-                      {Icon && <Icon className="w-4 h-4 text-gray-400 mr-2" />}
-                      {field === 'description' || field === 'cause' || field === 'symptoms' || field === 'treatments' ? (
-                        <textarea
-                          name={field}
-                          value={formData[field]}
-                          onChange={handleChange}
-                          className="w-full p-2 outline-none resize-none text-justify"
-                          placeholder={`Enter ${label}`}
-                          rows={3}
-                          disabled={uploading}
-                          required
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          name={field}
-                          value={formData[field]}
-                          onChange={handleChange}
-                          className="w-full p-2 outline-none"
-                          placeholder={`Enter ${label}`}
-                          required
-                          disabled={uploading}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              const isTextArea = ['description', 'cause', 'symptoms', 'treatments'].includes(field);
 
-              {/* Affected Parts - Fixed spacing */}
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Affected Part(s) <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {affectedPartOptions.map((part) => (
-                    <label key={part} className="inline-flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 transition">
-                      <input
-                        type="checkbox"
-                        name="affectedParts"
-                        value={part}
-                        checked={Array.isArray(formData.affectedParts) && formData.affectedParts.includes(part)}
+              return (
+                <div key={field} className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500 transition">
+                    {Icon && <Icon className="w-4 h-4 text-gray-400 mr-2" />}
+                    {isTextArea ? (
+                      <textarea
+                        name={field}
+                        value={formData[field]}
                         onChange={handleChange}
+                        className="w-full p-2 outline-none resize-none text-justify"
+                        placeholder={`Enter ${label}`}
+                        rows={3}
                         disabled={uploading}
-                        className="w-4 h-4"
+                        required
                       />
-                      <span className="text-sm">{part}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Show existing images if editing */}
-              {isEdit && diseaseData?.images && diseaseData.images.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Images</label>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {diseaseData.images.slice(0, 6).map((imgUrl, idx) => (
-                      <div key={idx} className="relative rounded-lg overflow-hidden border">
-                        <img
-                          src={imgUrl}
-                          alt={`current-${idx}`}
-                          className="w-full h-20 object-cover"
-                          onError={(e) => {
-                            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f0f0f0"/><text x="50" y="50" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="%23999">No Image</text></svg>';
-                          }}
-                        />
-                      </div>
-                    ))}
-                    {diseaseData.images.length > 6 && (
-                      <div className="flex items-center justify-center rounded-lg border bg-gray-100">
-                        <span className="text-xs text-gray-500">+{diseaseData.images.length - 6} more</span>
-                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        name={field}
+                        value={formData[field]}
+                        onChange={handleChange}
+                        className="w-full p-2 outline-none"
+                        placeholder={`Enter ${label}`}
+                        required
+                        disabled={uploading}
+                      />
                     )}
                   </div>
                 </div>
-              )}
+              );
+            })}
 
-              {/* Image Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {isEdit ? "Upload New Images (Optional)" : "Upload Images"}
-                  {!isEdit && <span className="text-red-500">*</span>}
-                </label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-5 cursor-pointer hover:border-green-500 transition">
-                  <UploadCloud className="w-10 h-10 text-gray-400 mb-2" />
-                  <span className="text-gray-500 text-sm text-center">
-                    Click or drag files here {isEdit ? "(Optional)" : "(Required - Max 2000 images)"}
-                  </span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageChange}
-                    disabled={uploading}
-                    required={!isEdit}
-                  />
-                </label>
-
-                {/* Image Previews */}
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="relative rounded-lg overflow-hidden border">
-                        <img
-                          src={URL.createObjectURL(img)}
-                          alt={`preview-${idx}`}
-                          className="w-full h-20 object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(idx)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                          disabled={uploading}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Upload Progress */}
-              {uploading && (
-                <div className="w-full">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
+            {/* Affected Parts */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Affected Part(s) <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {affectedPartOptions.map((part) => (
+                  <label key={part} className="inline-flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 transition">
+                    <input
+                      type="checkbox"
+                      name="affectedParts"
+                      value={part}
+                      checked={Array.isArray(formData.affectedParts) && formData.affectedParts.includes(part)}
+                      onChange={handleChange}
+                      disabled={uploading}
+                      className="w-4 h-4"
                     />
-                  </div>
+                    <span className="text-sm">{part}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Show existing images if editing */}
+            {isEdit && diseaseData?.images && diseaseData.images.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Images</label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {diseaseData.images.slice(0, 6).map((imgUrl, idx) => (
+                    <div key={idx} className="relative rounded-lg overflow-hidden border">
+                      <img
+                        src={imgUrl}
+                        alt={`current-${idx}`}
+                        className="w-full h-20 object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    </div>
+                  ))}
+                  {diseaseData.images.length > 6 && (
+                    <div className="flex items-center justify-center rounded-lg border bg-gray-100">
+                      <span className="text-xs text-gray-500">+{diseaseData.images.length - 6} more</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {isEdit ? "Upload New Images (Optional)" : "Upload Images"}
+                {!isEdit && <span className="text-red-500">*</span>}
+              </label>
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-5 cursor-pointer hover:border-green-500 transition">
+                <UploadCloud className="w-10 h-10 text-gray-400 mb-2" />
+                <span className="text-gray-500 text-sm text-center">
+                  Click or drag files here {isEdit ? "(Optional)" : "(Required - Max 2000 images)"}
+                </span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                  disabled={uploading}
+                  required={!isEdit}
+                />
+              </label>
+
+              {images.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {images.map((img, idx) => (
+                    <div key={idx} className="relative rounded-lg overflow-hidden border">
+                      <img
+                        src={URL.createObjectURL(img)}
+                        alt={`preview-${idx}`}
+                        className="w-full h-20 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        disabled={uploading}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-            </form>
-          </div>
+            </div>
 
-          {/* Fixed Footer */}
-          <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
-              disabled={uploading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="disease-form"
-              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
-              disabled={uploading}
-            >
-              {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
-            </button>
-          </div>
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="w-full">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+            disabled={uploading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="disease-form"
+            className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
+            disabled={uploading}
+          >
+            {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
+          </button>
         </div>
       </div>
 
-      {/* Toast Notification */}
-      {toast.show && (
-        <div className="fixed top-4 right-4 z-[60] animate-in slide-in-from-right duration-300">
-          <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
-            toast.type === 'error' 
-              ? 'bg-red-50 border border-red-200 text-red-800' 
-              : 'bg-green-50 border border-green-200 text-green-800'
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-[60]">
+          <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 border ${
+            toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'
           }`}>
             <AlertCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">{toast.message}</span>
+            <span className="text-sm font-medium">{toast.msg}</span>
             <button
-              onClick={() => setToast({ show: false, message: "", type: "error" })}
-              className="ml-2 text-gray-400 hover:text-gray-600"
+              onClick={() => setToast(null)}
+              className="ml-1 text-gray-400 hover:text-gray-600"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
