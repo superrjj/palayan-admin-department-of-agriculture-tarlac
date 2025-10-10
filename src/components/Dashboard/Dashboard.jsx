@@ -268,7 +268,7 @@ const Dashboard = () => {
         console.warn('predictions orderBy fallback:', err?.code || err?.message);
         if (unsub) unsub();
         unsub = onSnapshot(
-          query(collectionGroup(db, 'predictions'), fbLimit(3000)),
+          query(collectionGroup(db, 'predictions_result'), fbLimit(3000)),
           (snap2) => {
             const byDiseaseMonthly = new Map();
             const totals = new Map();

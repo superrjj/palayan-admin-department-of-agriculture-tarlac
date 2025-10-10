@@ -8,14 +8,12 @@ import { Eye, Edit, Trash, X, Calendar, CheckCircle, AlertCircle } from "lucide-
 const PestManagement = () => {
   const [pests, setPests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  // eslint-disable-next-line no-unused-vars
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editPest, setEditPest] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // NEW: sorting and filters for header
   const [sortBy, setSortBy] = useState('name-asc');
 
   useEffect(() => {
@@ -31,7 +29,6 @@ const PestManagement = () => {
     recommendedInTarlac: '',
   });
 
-  // NEW: Confirm Delete (type pest name)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null); // { id, name }
   const [confirmInput, setConfirmInput] = useState('');
@@ -39,7 +36,6 @@ const PestManagement = () => {
 
   const [viewPest, setViewPest] = useState(null);
 
-  // current user for audit logs (mirrors AdminManagement)
   const [currentUser, setCurrentUser] = useState({
     id: 'default_user',
     fullname: 'System User',
@@ -47,7 +43,6 @@ const PestManagement = () => {
     email: 'system@example.com'
   });
 
-  // Toast
   const [toast, setToast] = useState(null); // { ok: boolean, msg: string }
   const showToast = (ok, msg, ms = 1800) => {
     setToast({ ok, msg });
@@ -96,6 +91,7 @@ const PestManagement = () => {
       error => {
         console.error("Error fetching pests:", error);
         setLoading(false);
+        showToast(false, "Error loading pests. Please try again.");
       }
     );
     return () => unsub();
@@ -116,7 +112,6 @@ const PestManagement = () => {
       (p.scientificName || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  // Apply sorting based on sortBy
   const sortedPests = [...filteredPests].sort((a, b) => {
     switch (sortBy) {
       case 'name-asc':
@@ -140,7 +135,6 @@ const PestManagement = () => {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedPests = sortedPests.slice(startIndex, startIndex + itemsPerPage);
-  // eslint-disable-next-line no-unused-vars
   const totalPages = Math.ceil(sortedPests.length / itemsPerPage);
 
   const handleAddNew = () => {
@@ -220,14 +214,12 @@ const PestManagement = () => {
     setIsModalOpen(true);
   };
 
-  // Open confirm dialog (type the pest name)
   const openDeleteModal = (pest) => {
     setConfirmTarget({ id: pest.id, name: pest.name || 'Unnamed Pest' });
     setConfirmInput('');
     setConfirmOpen(true);
   };
 
-  // Perform soft delete after confirmation
   const confirmDeleteNow = async () => {
     if (!confirmTarget) return;
     setConfirmBusy(true);
@@ -305,7 +297,7 @@ const PestManagement = () => {
             paginatedPests.map(pest => (
               <div 
                 key={pest.id} 
-                className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative"
+                className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative flex flex-col h-full"
               >
                 {pest.mainImageUrl && (
                   <img 
@@ -339,6 +331,8 @@ const PestManagement = () => {
                   <p><span className="font-medium">Created Date:</span> {pest.createdAt?.toDate ? pest.createdAt.toDate().toLocaleString() : "N/A"}</p>
                   <p><span className="font-medium">Last Updated:</span> {pest.updatedAt?.toDate ? pest.updatedAt.toDate().toLocaleString() : "-"}</p>
                 </div>
+
+                <div className="mt-auto" />
 
                 <div className="flex justify-center gap-2 mt-3">
                   <button
@@ -387,7 +381,6 @@ const PestManagement = () => {
           onClick={() => { if (!confirmBusy) cancelDelete(); }}
         >
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            {/* Fixed Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
                 Delete Pest
@@ -401,7 +394,6 @@ const PestManagement = () => {
               </button>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-5">
               <div className="flex flex-col items-center text-center">
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -432,7 +424,6 @@ const PestManagement = () => {
               </div>
             </div>
 
-            {/* Fixed Footer */}
             <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
               <button
                 onClick={cancelDelete}
@@ -462,7 +453,6 @@ const PestManagement = () => {
           onClick={() => setViewPest(null)}
         >
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            {/* Fixed Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
                 View Pest Details
@@ -475,7 +465,6 @@ const PestManagement = () => {
               </button>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-5">
               <div className="space-y-4">
                 <div>

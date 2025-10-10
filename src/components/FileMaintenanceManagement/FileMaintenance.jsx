@@ -311,24 +311,51 @@ const FileMaintenance = () => {
   const section = (title, keyName, placeholder) => {
     const limit = 5;
     const list = draft[keyName] || [];
+    const serverList = data[keyName] || [];
     const isExpanded = expanded[keyName];
     const visible = isExpanded ? list : list.slice(0, limit);
     const remaining = Math.max(0, list.length - limit);
+    
+    // Check if this section has unsaved changes
+    const hasUnsavedChanges = JSON.stringify(list.sort()) !== JSON.stringify(serverList.sort());
 
     return (
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className={`relative overflow-hidden bg-white rounded-xl shadow border p-4 transition-colors ${
+        hasUnsavedChanges 
+          ? 'border-green-300 bg-green-50/30' 
+          : 'border-gray-100'
+      }`}>
+        <div className={`absolute inset-x-0 top-0 h-1 transition-colors ${
+          hasUnsavedChanges 
+            ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-lime-500' 
+            : 'bg-gradient-to-r from-green-500 via-emerald-400 to-lime-400 opacity-80'
+        }`} />
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">{title}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-gray-800">{title}</h3>
+            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+              hasUnsavedChanges 
+                ? 'bg-green-100 text-green-800 border-green-200' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            }`}>
+              {(list || []).length}
+            </span>
+            {hasUnsavedChanges && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                Unsaved
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <input
               value={inputs[keyName]}
               onChange={(e) => setInputs((p) => ({ ...p, [keyName]: e.target.value }))}
               placeholder={placeholder}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-0 focus:outline-none focus-visible:outline-none"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-green-500/40"
             />
             <button
               onClick={() => addItem(keyName)}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-sm"
+              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 shadow-sm hover:shadow flex items-center gap-1 text-sm transition"
             >
               <Plus className="w-4 h-4" /> Add
             </button>
@@ -338,18 +365,29 @@ const FileMaintenance = () => {
         {list.length ? (
           <>
             <ul className="divide-y divide-gray-200 min-h-[140px]">
-              {visible.map((v) => (
-                <li key={`${keyName}-${v}`} className="flex items-center justify-between py-2">
-                  <span className="text-sm">{v}</span>
-                  <button
-                    onClick={() => askRemove(keyName, v)}
-                    className="text-red-600 hover:text-red-800"
-                    title="Remove"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </li>
-              ))}
+              {visible.map((v) => {
+                // Check if this item is newly added (not in server data)
+                const isNewItem = !serverList.includes(v);
+                return (
+                  <li key={`${keyName}-${v}`} className="flex items-center justify-between py-2">
+                    <span className={`text-sm px-2 py-1 rounded-md border ${
+                      isNewItem 
+                        ? 'bg-green-50 border-green-200 text-green-800 font-medium' 
+                        : 'bg-gray-50 border-gray-200 text-gray-700'
+                    }`}>
+                      {v}
+                      {isNewItem && <span className="ml-1 text-xs">●</span>}
+                    </span>
+                    <button
+                      onClick={() => askRemove(keyName, v)}
+                      className="text-red-600 hover:text-red-800 rounded-md p-1 hover:bg-red-50"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
 
             {remaining > 0 && (
@@ -373,54 +411,93 @@ const FileMaintenance = () => {
   };
 
   // Accounts section (uses sqDraft)
-  const accountsSection = (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-800">Security Questions</h3>
-        <div className="flex gap-2">
-          <input
-            value={sqInput}
-            onChange={(e) => setSqInput(e.target.value)}
-            placeholder="e.g., What is your favorite teacher’s name?"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-0 focus:outline-none focus-visible:outline-none"
-          />
-          <button
-            onClick={addSecurityQuestion}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1 text-sm"
-          >
-            <Plus className="w-4 h-4" /> Add
-          </button>
+  const accountsSection = (() => {
+    // Check if accounts section has unsaved changes
+    const hasUnsavedChanges = JSON.stringify(sqDraft.sort()) !== JSON.stringify(securityQuestions.sort());
+    
+    return (
+      <div className={`relative overflow-hidden bg-white rounded-xl shadow border p-4 transition-colors ${
+        hasUnsavedChanges 
+          ? 'border-green-300 bg-green-50/30' 
+          : 'border-gray-100'
+      }`}>
+        <div className={`absolute inset-x-0 top-0 h-1 transition-colors ${
+          hasUnsavedChanges 
+            ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-lime-500' 
+            : 'bg-gradient-to-r from-green-500 via-emerald-400 to-lime-400 opacity-80'
+        }`} />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-gray-800">Security Questions</h3>
+            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+              hasUnsavedChanges 
+                ? 'bg-green-100 text-green-800 border-green-200' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            }`}>
+              {sqDraft.length}
+            </span>
+            {hasUnsavedChanges && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                Unsaved
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={sqInput}
+              onChange={(e) => setSqInput(e.target.value)}
+              placeholder="e.g., What is your favorite teacher's name?"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-green-500/40"
+            />
+            <button
+              onClick={addSecurityQuestion}
+              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 shadow-sm hover:shadow flex items-center gap-1 text-sm transition"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
         </div>
-      </div>
 
-      {accLoading ? (
-        <div className="text-gray-600 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
-        </div>
-      ) : sqDraft.length ? (
-        <ul className="divide-y divide-gray-200 min-h-[140px]">
-          {sqDraft.map((q) => (
-            <li key={`sq-${q}`} className="flex items-center justify-between py-2">
-              <span className="text-sm">{q}</span>
-              <button
-                onClick={() => askRemoveSecurityQuestion(q)}
-                className="text-red-600 hover:text-red-800"
-                title="Remove"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-gray-500">No security questions yet.</p>
-      )}
-    </div>
-  );
+        {accLoading ? (
+          <div className="text-gray-600 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
+          </div>
+        ) : sqDraft.length ? (
+          <ul className="divide-y divide-gray-200 min-h-[140px]">
+            {sqDraft.map((q) => {
+              // Check if this question is newly added (not in server data)
+              const isNewItem = !securityQuestions.includes(q);
+              return (
+                <li key={`sq-${q}`} className="flex items-center justify-between py-2">
+                  <span className={`text-sm px-2 py-1 rounded-md border ${
+                    isNewItem 
+                      ? 'bg-green-50 border-green-200 text-green-800 font-medium' 
+                      : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}>
+                    {q}
+                    {isNewItem && <span className="ml-1 text-xs">●</span>}
+                  </span>
+                  <button
+                    onClick={() => askRemoveSecurityQuestion(q)}
+                    className="text-red-600 hover:text-red-800 rounded-md p-1 hover:bg-red-50"
+                    title="Remove"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">No security questions yet.</p>
+        )}
+      </div>
+    );
+  })();
 
   // Top selector grid
   const selectorGrid = (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {[
         { id: 'variety', label: 'Rice Variety', desc: 'Manage variety enums' },
         { id: 'pest', label: 'Pest', desc: 'Manage pest-related lists' },
@@ -430,10 +507,10 @@ const FileMaintenance = () => {
         <button
           key={m.id}
           onClick={() => requestSwitchModule(m.id)}
-          className="text-left bg-white rounded-lg shadow p-5 hover:shadow-md transition border border-transparent hover:border-green-200"
+          className="relative text-left bg-white rounded-xl shadow p-6 md:p-7 hover:shadow-lg transition border border-gray-100 hover:border-emerald-200 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-emerald-400/40 min-h-28"
         >
-          <div className="text-lg font-semibold">{m.label}</div>
-          <div className="text-sm text-gray-600">{m.desc}</div>
+          <div className="text-lg md:text-xl font-semibold text-gray-900">{m.label}</div>
+          <div className="text-sm md:text-base text-gray-600 mt-0.5">{m.desc}</div>
         </button>
       ))}
     </div>
@@ -552,7 +629,7 @@ const FileMaintenance = () => {
             </div>
           </div>
 
-          <div className="mt-4 bg-white rounded-lg shadow p-6">
+          <div className="mt-4 bg-white rounded-xl shadow p-6 border border-gray-100">
             <p className="text-sm text-gray-600">
               Placeholder for {titles[activeModule]} maintenance. Wala pang code.
             </p>
@@ -571,52 +648,52 @@ const FileMaintenance = () => {
       {renderModule()}
 
       {toast && (
-        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow text-white flex items-center gap-2 ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white flex items-center gap-2 ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>
           {toast.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
           <span className="text-sm">{toast.msg}</span>
         </div>
       )}
 
       {confirmOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-2xl w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2 text-red-600">Confirm Remove</h4>
             <p className="text-sm text-gray-700">
               Remove “{confirmTarget?.value}” from {confirmTarget?.key}? This will be removed from the draft. Save Changes to persist.
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpen(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
-              <button onClick={doRemove} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+              <button onClick={doRemove} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 shadow">Remove</button>
             </div>
           </div>
         </div>
       )}
 
       {confirmOpenAcc && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-2xl w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2 text-red-600">Confirm Remove</h4>
             <p className="text-sm text-gray-700">
               Remove “{confirmTargetAcc?.value}” from Security Questions draft? Save Changes to persist.
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpenAcc(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>
-              <button onClick={doRemoveSecurityQuestion} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+              <button onClick={doRemoveSecurityQuestion} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 shadow">Remove</button>
             </div>
           </div>
         </div>
       )}
 
       {switchGuard.open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-2xl w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2 text-amber-600">Discard changes?</h4>
             <p className="text-sm text-gray-700">
               You have unsaved changes. If you continue, your edits will be discarded.
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={cancelSwitch} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Stay</button>
-              <button onClick={discardChanges} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">Discard</button>
+              <button onClick={discardChanges} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 shadow">Discard</button>
             </div>
           </div>
         </div>
