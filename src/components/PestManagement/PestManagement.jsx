@@ -148,6 +148,11 @@ const PestManagement = () => {
     setIsModalOpen(true);
   };
 
+  const closePestModal = () => {
+    setIsModalOpen(false);
+    setEditPest(null);
+  };
+
   const handleAddOrEditPest = async (pestData, id) => {
     try {
       const dataToSave = {
@@ -308,7 +313,7 @@ const PestManagement = () => {
                     src={pest.mainImageUrl} 
                     alt={pest.name} 
                     className="w-full h-40 object-cover rounded mb-3"
-                    onError={(e) => { e.target.style.display = 'none'; }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
                 <h3 className="font-semibold text-lg">{pest.name || 'Unnamed Pest'}</h3>
@@ -363,17 +368,26 @@ const PestManagement = () => {
       )}
 
       {isModalOpen && (
-        <AddPestModal
-          onClose={() => { setIsModalOpen(false); setEditPest(null); }}
-          onSave={handleAddOrEditPest}
-          pestData={editPest}
-        />
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onMouseDown={closePestModal}
+        >
+          <div onMouseDown={(e) => e.stopPropagation()}>
+            <AddPestModal
+              onClose={closePestModal}
+              onSave={handleAddOrEditPest}
+              pestData={editPest}
+            />
+          </div>
+        </div>
       )}
 
-      {/* Confirm Delete Dialog - type the pest name, centered header with red circle X */}
       {confirmOpen && confirmTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onMouseDown={() => { if (!confirmBusy) cancelDelete(); }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex flex-col items-center text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash className="w-8 h-8 text-red-600" />
@@ -426,10 +440,15 @@ const PestManagement = () => {
         </div>
       )}
 
-      {/* View Pest Card */}
       {viewPest && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/40 flex justify-center items-start pt-20 z-50"
+          onMouseDown={() => setViewPest(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 relative max-h-[90vh] overflow-y-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setViewPest(null)}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"

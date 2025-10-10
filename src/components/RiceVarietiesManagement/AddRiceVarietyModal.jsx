@@ -162,15 +162,24 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl relative">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl relative">
-        <div className="p-5 border-b flex items-center justify-between">
-          <h2 className="text-xl md:text-2xl font-semibold">
-            {varietyData ? 'Edit Rice Variety' : 'Add Rice Variety'}
-          </h2>
-        </div>
+    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl relative flex flex-col max-h-[90vh]">
+      {/* Fixed Header */}
+      <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+        <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
+          {varietyData ? 'Edit Rice Variety' : 'Add Rice Variety'}
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-red-500 transition"
+          disabled={submitting}
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-6 max-h-[75vh] overflow-y-auto">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-5">
+        <form onSubmit={handleSubmit} className="space-y-6" id="rice-variety-form">
           {/* Identity */}
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Identity</h3>
@@ -182,7 +191,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                 { name: 'breederOrigin', label: 'Breeder Origin', ph: 'e.g., PhilRice' }
               ].map(f => (
                 <div key={f.name} className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    {f.label} <span className="text-red-500">*</span>
+                  </label>
                   <input
                     name={f.name}
                     value={form[f.name]}
@@ -195,7 +206,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                 </div>
               ))}
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">Year Release</label>
+                <label className="text-sm font-medium text-gray-700 mb-1">
+                  Year Release <span className="text-red-500">*</span>
+                </label>
                 <select
                   name="yearRelease"
                   value={form.yearRelease}
@@ -222,7 +235,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                 { name: 'tillers', label: 'Tillers (count)', ph: 'e.g., 16' }
               ].map(f => (
                 <div key={f.name} className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    {f.label} <span className="text-red-500">*</span>
+                  </label>
                   <input
                     name={f.name}
                     value={form[f.name]}
@@ -242,7 +257,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               ].map(f => (
                 <div key={f.name} className="flex flex-col">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                    <label className="text-sm font-medium text-gray-700 mb-1">
+                      {f.label} <span className="text-red-500">*</span>
+                    </label>
                     <span className="text-[11px] text-gray-500 flex items-center gap-1"><Info size={12} /> tonelada/hectar</span>
                   </div>
                   <input
@@ -264,7 +281,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
             <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Recommendation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label className="text-sm font-medium text-gray-700 mb-1">
+                  Location <span className="text-red-500">*</span>
+                </label>
                 <input
                   name="location"
                   value={form.location}
@@ -276,7 +295,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
                 {showErr('location') && <span className="text-xs text-red-500 mt-1">{errors.location}</span>}
               </div>
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">Planting Method</label>
+                <label className="text-sm font-medium text-gray-700 mb-1">
+                  Planting Method <span className="text-red-500">*</span>
+                </label>
                 <select
                   name="plantingMethod"
                   value={form.plantingMethod}
@@ -296,7 +317,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-2">Season</label>
+                <label className="text-sm font-medium text-gray-700 mb-2">
+                  Season <span className="text-red-500">*</span>
+                </label>
                 <div className="flex flex-wrap gap-4">
                   {seasons.map(s => (
                     <label key={s} className="inline-flex items-center gap-2">
@@ -316,7 +339,9 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
               </div>
 
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-2">Environment</label>
+                <label className="text-sm font-medium text-gray-700 mb-2">
+                  Environment <span className="text-red-500">*</span>
+                </label>
                 <div className="flex flex-wrap gap-4">
                   {environments.map(env => (
                     <label key={env} className="inline-flex items-center gap-2">
@@ -350,22 +375,27 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
             </label>
           </div>
           </section>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 transition text-sm"
-            >
-              <CheckCircle className="w-5 h-5" />
-              <span>{submitting ? 'Saving...' : varietyData ? 'Update' : 'Save'}</span>
-            </button>
-          </div>
         </form>
+      </div>
+
+      {/* Fixed Footer - Same structure as AddPestModal */}
+      <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+          disabled={submitting}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="rice-variety-form"
+          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
+          disabled={submitting}
+        >
+          {submitting ? "Saving..." : (varietyData ? "Update" : "Save")}
+        </button>
       </div>
 
       {/* Confirm Dialog */}
@@ -374,7 +404,7 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-5">
             <h4 className="text-lg font-semibold mb-2">{varietyData ? 'Confirm Update' : 'Confirm Save'}</h4>
             <p className="text-sm text-gray-600">
-              Are you sure you want to {varietyData ? 'update' : 'save'} “{form.varietyName || 'this variety'}”?
+              Are you sure you want to {varietyData ? 'update' : 'save'} "{form.varietyName || 'this variety'}"?
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmOpen(false)} className="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Cancel</button>

@@ -21,13 +21,10 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    console.log(`Field ${name} changed to:`, value);
   };
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-    console.log("Selected files:", files);
-
     if (files.length + images.length > 10) {
       alert("You can upload a maximum of 10 images.");
       return;
@@ -36,12 +33,10 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   };
 
   const handleRemoveImage = (index) => {
-    console.log("Removing image at index:", index);
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadImages = async (imageFiles) => {
-    console.log("Starting image upload for", imageFiles.length, "files");
     const uploadPromises = imageFiles.map(async (file, index) => {
       const fileName = `${Date.now()}_${index}_${file.name}`;
       const storageRef = ref(storage, `rice_pests/${formData.name}/${fileName}`);
@@ -53,19 +48,13 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
           (snapshot) => {
             const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
             setUploadProgress(progress);
-            console.log(`Upload progress for ${file.name}: ${progress}%`);
           },
-          (error) => {
-            console.error(`Upload error for ${file.name}:`, error);
-            reject(error);
-          },
+          (error) => reject(error),
           async () => {
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              console.log(` Upload completed for ${file.name}:`, downloadURL);
               resolve(downloadURL);
             } catch (error) {
-              console.error(`Error getting download URL for ${file.name}:`, error);
               reject(error);
             }
           }
@@ -96,10 +85,8 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
       let mainImageUrl = pestData?.mainImageUrl || "";
 
       if (images.length > 0) {
-        console.log("Uploading", images.length, "images...");
         imageUrls = await uploadImages(images);
         mainImageUrl = imageUrls[0];
-        console.log("All images uploaded:", imageUrls);
       }
 
       const dataToSave = {
@@ -109,19 +96,15 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
         cause: formData.cause.trim(),
         symptoms: formData.symptoms.trim(),
         treatments: formData.treatments.trim(),
-        mainImageUrl: mainImageUrl,
+        mainImageUrl,
         images: imageUrls.length > 0 ? imageUrls : (pestData?.images || []),
       };
-
-      console.log("Calling onSave with data:", dataToSave);
 
       await onSave(dataToSave, pestData?.id);
 
       setImages([]);
       setUploadProgress(0);
-
     } catch (error) {
-      console.error("Error in form submission:", error);
       alert(`Error saving pest: ${error.message}`);
     } finally {
       setUploading(false);
@@ -138,21 +121,23 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 relative max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4 border-b pb-2">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
-            {isEdit ? "Edit Pest" : "Add New Pest"}
-          </h2>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-red-500 transition"
-            disabled={uploading}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative flex flex-col max-h-[90vh]">
+      {/* Fixed Header */}
+      <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+        <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
+          {isEdit ? "Edit Pest" : "Add New Pest"}
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-red-500 transition"
+          disabled={uploading}
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-5">
         <form onSubmit={handleSubmit} className="space-y-3">
           {["name", "scientificName", "description", "cause", "symptoms", "treatments"].map((field) => {
             const Icon = fieldIcons[field];
@@ -164,7 +149,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
             return (
               <div key={field} className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {label} {field === 'name' && <span className="text-red-500">*</span>}
+                  {label} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500 transition">
                   {Icon && <Icon className="w-4 h-4 text-gray-400 mr-2" />}
@@ -177,6 +162,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
                       placeholder={`Enter ${label}`}
                       rows={3}
                       disabled={uploading}
+                      required
                     />
                   ) : (
                     <input
@@ -186,7 +172,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
                       onChange={handleChange}
                       className="w-full p-2 outline-none"
                       placeholder={`Enter ${label}`}
-                      required={field === 'name'}
+                      required
                       disabled={uploading}
                     />
                   )}
@@ -202,13 +188,11 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {pestData.images.slice(0, 6).map((imgUrl, idx) => (
                   <div key={idx} className="relative rounded-lg overflow-hidden border">
-                    <img 
-                      src={imgUrl} 
-                      alt={`current-${idx}`} 
+                    <img
+                      src={imgUrl}
+                      alt={`current-${idx}`}
                       className="w-full h-20 object-cover"
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f0f0f0"/><text x="50" y="50" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="%23999">No Image</text></svg>';
-                      }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   </div>
                 ))}
@@ -224,7 +208,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isEdit ? "Upload New Images (Optional)" : "Upload Images"} 
+              {isEdit ? "Upload New Images (Optional)" : "Upload Images"}
               {!isEdit && <span className="text-red-500">*</span>}
             </label>
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-5 cursor-pointer hover:border-green-500 transition">
@@ -232,13 +216,14 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
               <span className="text-gray-500 text-sm text-center">
                 Click or drag files here {isEdit ? "(Optional)" : "(Required - Max 10 images)"}
               </span>
-              <input 
-                type="file" 
-                multiple 
-                accept="image/*" 
-                className="hidden" 
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
                 onChange={handleImageChange}
                 disabled={uploading}
+                required={!isEdit}
               />
             </label>
 
@@ -246,10 +231,10 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
               <div className="grid grid-cols-3 gap-2 mt-2">
                 {images.map((img, idx) => (
                   <div key={idx} className="relative rounded-lg overflow-hidden border">
-                    <img 
-                      src={URL.createObjectURL(img)} 
-                      alt={`preview-${idx}`} 
-                      className="w-full h-20 object-cover" 
+                    <img
+                      src={URL.createObjectURL(img)}
+                      alt={`preview-${idx}`}
+                      className="w-full h-20 object-cover"
                     />
                     <button
                       type="button"
@@ -273,33 +258,34 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
                 <span>{uploadProgress}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                <div
+                  className="bg-green-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
-                ></div>
+                />
               </div>
             </div>
           )}
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-2 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
-              disabled={uploading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
-              disabled={uploading}
-            >
-              {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
-            </button>
-          </div>
         </form>
+      </div>
+
+      {/* Fixed Footer */}
+      <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+          disabled={uploading}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="pest-form"
+          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
+          disabled={uploading}
+        >
+          {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
+        </button>
       </div>
     </div>
   );
