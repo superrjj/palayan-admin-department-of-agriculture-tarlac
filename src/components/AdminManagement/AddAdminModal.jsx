@@ -147,8 +147,11 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 relative animate-fadeIn max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div 
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 relative animate-fadeIn max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center mb-6 border-b pb-3">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">
             {isEdit ? "Edit Admin" : "Add New Admin"}
@@ -160,7 +163,9 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Full Name <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
               <User className="w-4 h-4 text-gray-400 mr-2" />
               <input
@@ -176,7 +181,9 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
               <Mail className="w-4 h-4 text-gray-400 mr-2" />
               <input
@@ -200,7 +207,9 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Username <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
               <Shield className="w-4 h-4 text-gray-400 mr-2" />
               <input
@@ -224,7 +233,9 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center border rounded-lg px-3 focus-within:ring-2 focus-within:ring-green-500">
               <Lock className="w-4 h-4 text-gray-400 mr-2" />
               <input
@@ -253,13 +264,16 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Role <span className="text-red-500">*</span>
+            </label>
             <select
               name="role"
               value={formData.role}
               onChange={handleChange}
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500"
               disabled={isEdit}
+              required
             >
               <option value="SYSTEM_ADMIN">System Admin</option>
               <option value="ADMIN">Admin</option>
