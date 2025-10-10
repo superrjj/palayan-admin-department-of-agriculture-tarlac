@@ -564,15 +564,6 @@ const PestManagement = () => {
               </div>
             </div>
 
-            {/* Fixed Footer */}
-            <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
-              <button
-                onClick={() => setViewPest(null)}
-                className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
