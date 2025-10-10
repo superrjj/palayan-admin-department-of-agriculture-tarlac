@@ -17,7 +17,6 @@ const History = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
 
-  // Actions that should be visible only to system admins
   const hiddenForRegular = useMemo(() => new Set(['LOGIN', 'RESTRICT', 'UNRESTRICT']), []);
 
   useEffect(() => {
@@ -112,8 +111,6 @@ const History = () => {
   const filteredLogs = useMemo(() => {
     return auditLogs.filter(log => {
       const actionUpper = (log.action || '').toUpperCase();
-
-      // Hide private/system-only actions for regular admins
       if (!isSystemAdmin() && hiddenForRegular.has(actionUpper)) return false;
 
       const matchesSearch = 
@@ -247,7 +244,12 @@ const History = () => {
 
       <div className="space-y-3">
         {filteredLogs.map((log) => (
-          <div key={log.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+          <div
+            key={log.id}
+            className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => setExpandedLog(log)}
+            role="button"
+          >
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
@@ -291,6 +293,96 @@ const History = () => {
           </div>
         )}
       </div>
+
+      {expandedLog && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setExpandedLog(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+                Log Details
+              </h2>
+              <button
+                onClick={() => setExpandedLog(null)}
+                className="text-gray-400 hover:text-red-500 transition"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-gray-500">Action</div>
+                  <div className="text-sm font-medium text-gray-800">{(expandedLog.action || '').toUpperCase() || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Collection</div>
+                  <div className="text-sm font-medium text-gray-800">{expandedLog.collection || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Document</div>
+                  <div className="text-sm font-medium text-gray-800">
+                    {expandedLog.documentName || expandedLog.documentId || '-'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Timestamp</div>
+                  <div className="text-sm font-medium text-gray-800">{formatTimestamp(expandedLog.timestamp)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">User</div>
+                  <div className="text-sm font-medium text-gray-800">
+                    {expandedLog.userName || 'Unknown'} {expandedLog.userEmail ? `(${expandedLog.userEmail})` : ''}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Description</div>
+                  <div className="text-sm font-medium text-gray-800 break-words">
+                    {expandedLog.description || '-'}
+                  </div>
+                </div>
+              </div>
+
+              {expandedLog.changes && (
+                <div className="mt-5 space-y-4">
+                  {'before' in expandedLog.changes && (
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800 mb-1">Before</div>
+                      <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap break-words">
+                        {JSON.stringify(expandedLog.changes.before, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {'after' in expandedLog.changes && (
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800 mb-1">After</div>
+                      <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap break-words">
+                        {JSON.stringify(expandedLog.changes.after, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={() => setExpandedLog(null)}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
