@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import RiceVarietyHeader from '../RiceVarietiesManagement/RiceVarietyHeader';
 import RiceVarietyTable from '../RiceVarietiesManagement/RiceVarietyTable';
 import AddRiceVarietyModal from '../RiceVarietiesManagement/AddRiceVarietyModal';
@@ -20,6 +21,12 @@ const RiceVarietiesManagement = () => {
     email: 'system@example.com'
   });
   const itemsPerPage = 20;
+
+  // Focus/highlight when navigated from History or after add/update
+  const location = useLocation();
+  const focusId = location.state?.focusId;
+  const [pendingFocusId, setPendingFocusId] = useState(null);
+  const focusedRef = useRef(null);
 
   // Confirm Delete Dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -83,6 +90,24 @@ const RiceVarietiesManagement = () => {
     };
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+    const targetId = focusId || pendingFocusId;
+    if (!targetId) return;
+    const t = setTimeout(() => {
+      const el = focusedRef.current;
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50', 'animate-pulse');
+        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+        setTimeout(() => el.classList.remove('animate-pulse'), 1200);
+        setTimeout(() => {
+          el.classList.remove('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50');
+        }, 2400);
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [focusId, pendingFocusId, varieties]);
 
   // Realtime fetch rice varieties from Firestore (only non-deleted)
   useEffect(() => {
@@ -211,6 +236,7 @@ const RiceVarietiesManagement = () => {
           changes: { before: currentVariety, after: updateData }
         });
         showToast(true, "Rice variety updated successfully");
+        setPendingFocusId(id);
       } else {
         const newVarietyData = {
           ...varietyData,
@@ -231,6 +257,7 @@ const RiceVarietiesManagement = () => {
           changes: { before: null, after: newVarietyData }
         });
         showToast(true, "New rice variety added successfully");
+        setPendingFocusId(docRef.id);
       }
       handleModalClose();
     } catch (error) {
@@ -311,6 +338,8 @@ const RiceVarietiesManagement = () => {
         startIndex={startIndex}
         itemsPerPage={itemsPerPage}
         filteredVarieties={filteredVarieties}
+        focusId={focusId || pendingFocusId}
+        focusedRef={focusedRef}
       />
 
       {isModalOpen && (

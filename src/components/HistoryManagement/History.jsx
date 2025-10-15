@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, Edit, Trash2, Plus, Clock, Database, Activity, User, Lock, Unlock } from 'lucide-react';
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useRole } from '../../contexts/RoleContext';
@@ -18,6 +19,7 @@ const History = () => {
   const [nowTick, setNowTick] = useState(Date.now());
 
   const hiddenForRegular = useMemo(() => new Set(['LOGIN', 'RESTRICT', 'UNRESTRICT']), []);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30000);
@@ -219,6 +221,25 @@ const History = () => {
     a.click();
   };
 
+  const resolveTarget = (log) => {
+    const collection = (log.collection || '').toString().toLowerCase();
+    const id = log.documentId || log.id || log.document_id || null;
+    if (!id) return null;
+    if (collection.includes('variet')) return { path: '/dashboard/rice_varieties', focusId: id };
+    if (collection.includes('pest')) return { path: '/dashboard/rice_pests', focusId: id };
+    if (collection.includes('disease')) return { path: '/dashboard/rice_diseases', focusId: id };
+    if (collection.includes('account') || collection.includes('accounts')) return { path: '/dashboard/accounts', focusId: id };
+    return null;
+  };
+
+  const handleLogClick = (log) => {
+    const action = (log.action || '').toUpperCase();
+    if (action === 'DELETE' || action === 'DELETED' || action === 'REMOVE' || action === 'REMOVED') return;
+    const target = resolveTarget(log);
+    if (!target) return;
+    navigate(target.path, { state: { focusId: target.focusId } });
+  };
+
   return (
     <div className="p-4 lg:p-6">
       <HistoryHeader
@@ -243,12 +264,18 @@ const History = () => {
       />
 
       <div className="space-y-3">
-        {filteredLogs.map((log) => (
+        {filteredLogs.map((log) => {
+          const actionUpper = (log.action || '').toUpperCase();
+          const isDelete = ['DELETE','DELETED','REMOVE','REMOVED'].includes(actionUpper);
+          const clickable = !isDelete && !!resolveTarget(log);
+          return (
           <div
             key={log.id}
-            className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => setExpandedLog(log)}
-            role="button"
+            className={`bg-white rounded-lg shadow-sm border transition-shadow ${clickable ? 'hover:shadow-md cursor-pointer' : 'opacity-90'}`}
+            onClick={() => clickable ? handleLogClick(log) : undefined}
+            role={clickable ? 'button' : 'listitem'}
+            aria-disabled={!clickable}
+            title={clickable ? 'Go to record' : 'Not navigable'}
           >
             <div className="p-4">
               <div className="flex items-center justify-between">
@@ -279,7 +306,7 @@ const History = () => {
               </div>
             </div>
           </div>
-        ))}
+        );})}
 
         {filteredLogs.length === 0 && (
           <div className="text-center py-8">

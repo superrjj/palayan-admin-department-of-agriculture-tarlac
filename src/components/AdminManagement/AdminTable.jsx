@@ -12,7 +12,9 @@ const AdminTable = ({
   totalPages, 
   setCurrentPage,
   currentUserId,
-  activityByUserId // map: { [userId]: true } if has activities
+  activityByUserId, // map: { [userId]: true } if has activities
+  focusId,
+  focusedRef
 }) => {
 
   const getRoleIcon = (role) => role === 'super admin'
@@ -76,7 +78,12 @@ const AdminTable = ({
                 const isRestrictDisabled = isSelf;
 
                 return (
-                  <tr key={admin.id} className="hover:bg-gray-50 transition-all">
+                  <tr
+                    key={admin.id}
+                    ref={focusId === admin.id ? focusedRef : null}
+                    tabIndex={focusId === admin.id ? 0 : -1}
+                    className={`transition-all ${focusId === admin.id ? 'ring-0' : ''} hover:bg-gray-50`}
+                  >
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{admin.fullname}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{admin.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{admin.username}</td>

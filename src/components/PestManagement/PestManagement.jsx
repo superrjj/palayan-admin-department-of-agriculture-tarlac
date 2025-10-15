@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import PestHeader from './PestHeader';
 import AddPestModal from './AddPestModal';
 import { addDoc, collection, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
@@ -52,6 +53,12 @@ const PestManagement = () => {
 
   const itemsPerPage = 50;
 
+  // Focus/highlight when navigated from History
+  const location = useLocation();
+  const focusId = location.state?.focusId;
+  const [pendingFocusId, setPendingFocusId] = useState(null);
+  const focusedRef = useRef(null);
+
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
@@ -77,6 +84,24 @@ const PestManagement = () => {
     };
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+    const targetId = focusId || pendingFocusId;
+    if (!targetId) return;
+    const t = setTimeout(() => {
+      const el = focusedRef.current;
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50', 'animate-pulse');
+        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+        setTimeout(() => el.classList.remove('animate-pulse'), 1200);
+        setTimeout(() => {
+          el.classList.remove('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50');
+        }, 2400);
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [focusId, pendingFocusId, pests]);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -181,6 +206,7 @@ const PestManagement = () => {
         });
 
         showToast(true, "Pest updated successfully");
+        setPendingFocusId(id);
       } else {
         const next = { ...dataToSave, isDeleted: false, createdAt: new Date() };
         const docRef = await addDoc(collection(db, "rice_local_pests"), next);
@@ -199,6 +225,7 @@ const PestManagement = () => {
         });
 
         showToast(true, "Pest added successfully");
+        setPendingFocusId(docRef.id);
       }
 
       setIsModalOpen(false);
@@ -296,7 +323,8 @@ const PestManagement = () => {
           ) : (
             paginatedPests.map(pest => (
               <div 
-                key={pest.id} 
+                key={pest.id}
+                ref={focusId === pest.id ? focusedRef : null}
                 className="border rounded-lg p-4 shadow-md bg-white hover:shadow-xl hover:-translate-y-1 transition-transform duration-300 relative flex flex-col h-full"
               >
                 {pest.mainImageUrl && (

@@ -232,7 +232,7 @@ const Dashboard = () => {
     setStatsError(null);
 
     let unsub = onSnapshot(
-      query(collectionGroup(db, 'predictions'), orderBy('timestamp', 'desc'), fbLimit(3000)),
+      query(collectionGroup(db, 'predictions_result'), orderBy('timestamp', 'desc'), fbLimit(3000)),
       (snap) => {
         const byDiseaseMonthly = new Map();
         const totals = new Map();

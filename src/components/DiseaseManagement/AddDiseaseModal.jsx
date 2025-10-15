@@ -74,6 +74,19 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     setImages((prev) => [...prev, ...files]);
   };
 
+  // Allow selecting an entire folder of images (Chromium/Edge)
+  const handleFolderChange = (e) => {
+    const allFiles = Array.from(e.target.files || []);
+    const imageFiles = allFiles.filter((f) => (f.type || '').startsWith('image/'));
+    if (imageFiles.length + images.length > 2000) {
+      showToast("You can upload a maximum of 2000 images.");
+      return;
+    }
+    setImages((prev) => [...prev, ...imageFiles]);
+  };
+
+  const handleClearAllImages = () => setImages([]);
+
   const handleRemoveImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
@@ -302,6 +315,36 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
                   required={!isEdit}
                 />
               </label>
+
+              {/* Folder picker (Chromium/Edge support) */}
+              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                <label className="px-3 py-2 border rounded-lg text-sm cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="file"
+                    directory=""
+                    webkitdirectory=""
+                    multiple
+                    accept="image/*"
+                    onChange={handleFolderChange}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                  Select Folder of Images
+                </label>
+                {images.length > 0 && (
+                  <>
+                    <span className="text-sm text-gray-600">{images.length} image(s) selected</span>
+                    <button
+                      type="button"
+                      onClick={handleClearAllImages}
+                      className="text-sm text-red-600 hover:underline"
+                      disabled={uploading}
+                    >
+                      Clear All
+                    </button>
+                  </>
+                )}
+              </div>
 
               {images.length > 0 && (
                 <div className="grid grid-cols-3 gap-2 mt-2">

@@ -1,5 +1,6 @@
 // src/components/AdminManagement/AdminManagement.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import AdminHeader from '../AdminManagement/AdminHeader';
 import AdminTable from '../AdminManagement/AdminTable';
 import { useRole } from '../../contexts/RoleContext';
@@ -26,6 +27,12 @@ const AdminManagement = () => {
     email: 'system@example.com'
   });
   const itemsPerPage = 20;
+
+  // Focus/highlight when navigated from History
+  const location = useLocation();
+  const focusId = location.state?.focusId;
+  const focusedRef = useRef(null);
+  const [highlightActive, setHighlightActive] = useState(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null);
@@ -74,6 +81,31 @@ const AdminManagement = () => {
     };
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (!focusId) return;
+    setHighlightActive(true);
+    const t = setTimeout(() => {
+      const el = focusedRef.current;
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Apply strong visual emphasis
+        el.classList.add('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50', 'animate-pulse');
+        // Focus for accessibility
+        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+        // Remove pulse sooner
+        setTimeout(() => el.classList.remove('animate-pulse'), 1200);
+        // Remove bg/outline after delay
+        setTimeout(() => {
+          el.classList.remove('outline', 'outline-2', 'outline-amber-500', 'bg-amber-50');
+          setHighlightActive(false);
+        }, 2400);
+      }
+    }, 80);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [focusId, admins]);
 
   useEffect(() => {
     let qRef;
@@ -448,6 +480,8 @@ const AdminManagement = () => {
         setCurrentPage={setCurrentPage}
         currentUserId={currentUser.id}
         activityByUserId={activityByUserId}
+        focusId={focusId}
+        focusedRef={focusedRef}
       />
 
       {isModalOpen && (

@@ -51,6 +51,8 @@ const RiceVarietyTable = ({
   currentPage,
   totalPages,
   setCurrentPage,
+  focusId,
+  focusedRef,
 }) => {
   const [selectedVariety, setSelectedVariety] = useState(null);
 
@@ -108,7 +110,12 @@ const RiceVarietyTable = ({
                 </tr>
               ) : (
                 varieties.map((variety) => (
-                  <tr key={variety.id} className="hover:bg-gray-50 transition-all">
+                  <tr
+                    key={variety.id}
+                    ref={focusId === variety.id ? focusedRef : null}
+                    tabIndex={focusId === variety.id ? 0 : -1}
+                    className={`transition-all ${focusId === variety.id ? 'ring-0' : ''} hover:bg-gray-50`}
+                  >
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {variety.varietyName}
                     </td>
