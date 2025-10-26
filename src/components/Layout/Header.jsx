@@ -15,6 +15,7 @@ const Header = ({ setIsSidebarOpen }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const navigate = useNavigate();
 
   const menuRef = useRef(null);
@@ -182,11 +183,14 @@ const Header = ({ setIsSidebarOpen }) => {
                     Account Settings
                   </button>
                   <button
-                    onClick={() => setShowProfileMenu(false)}
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      setShowPrivacyPolicy(true);
+                    }}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full"
                   >
                     <Settings className="h-4 w-4 mr-3" />
-                    System Settings
+                    Privacy Policy
                   </button>
                   <hr className="my-2" />
                   <button
@@ -241,6 +245,10 @@ const Header = ({ setIsSidebarOpen }) => {
           onClose={() => setShowAccountModal(false)}
           onSaved={(next) => setUserData((prev) => ({ ...prev, ...next }))}
         />
+      )}
+
+      {showPrivacyPolicy && (
+        <PrivacyPolicyModal onClose={() => setShowPrivacyPolicy(false)} />
       )}
     </header>
   );
@@ -704,6 +712,153 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
         </div>
       )}
     </>
+  );
+};
+
+const PrivacyPolicyModal = ({ onClose }) => {
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    const onEsc = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [onClose]);
+
+  const onOverlayClick = (e) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      onMouseDown={onOverlayClick}
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      aria-modal="true"
+      role="dialog"
+    >
+      <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
+          <h3 className="text-lg font-semibold text-gray-800">Privacy Policy</h3>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100">
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-6 py-5" style={{ maxHeight: 'calc(90vh - 80px)' }}>
+          <div className="prose prose-sm max-w-none">
+            <h4 className="text-base font-semibold text-gray-800 mb-3">1. Information We Collect</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              We collect personal information that you voluntarily provide when you register for an account, 
+              including but not limited to your full name, email address, contact number, and profile picture. 
+              We also collect information about your activity within the system to ensure proper access control 
+              and audit trails.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">2. How We Use Your Information</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              The personal information we collect is used to:
+            </p>
+            <ul className="text-sm text-gray-700 mb-4 list-disc pl-5 space-y-1">
+              <li>Provide and maintain the admin system services</li>
+              <li>Verify your identity and manage your account</li>
+              <li>Communicate with you regarding system updates and security matters</li>
+              <li>Monitor and prevent unauthorized access or fraudulent activity</li>
+              <li>Generate audit logs for security and compliance purposes</li>
+            </ul>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">3. Data Protection</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              We implement industry-standard security measures to protect your personal information 
+              from unauthorized access, disclosure, alteration, or destruction. This includes:
+            </p>
+            <ul className="text-sm text-gray-700 mb-4 list-disc pl-5 space-y-1">
+              <li>Encrypted data transmission (SSL/TLS)</li>
+              <li>Secure authentication and session management</li>
+              <li>Regular security updates and monitoring</li>
+              <li>Access controls and role-based permissions</li>
+            </ul>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">4. Data Storage and Retention</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              Your data is stored securely in our database systems. We retain your information for as long as 
+              your account is active or as necessary to provide services and comply with legal obligations. 
+              When you delete your account, we will securely remove your data in accordance with our retention policies.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">5. Third-Party Services</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              We use Firebase for authentication and data storage. When you use our services, your data is 
+              subject to Firebase's privacy policy and terms of service. We do not share your personal 
+              information with third parties except as necessary to provide our services or as required by law.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">6. Your Rights</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              You have the right to:
+            </p>
+            <ul className="text-sm text-gray-700 mb-4 list-disc pl-5 space-y-1">
+              <li>Access and review your personal information</li>
+              <li>Update or correct inaccurate information</li>
+              <li>Request deletion of your account and data</li>
+              <li>Change your password at any time</li>
+              <li>Opt-out of non-essential communications</li>
+            </ul>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">7. Cookies and Tracking</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              We use session cookies and local storage to maintain your login session and preferences. 
+              These are essential for the system to function properly and do not track your activity 
+              across other websites.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">8. Security Question</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              If you have provided a security question and answer, this information is used solely 
+              for identity verification purposes in case of password recovery. This information is 
+              encrypted and stored securely.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">9. Children's Privacy</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              Our services are not directed to individuals under 18 years of age. We do not knowingly 
+              collect personal information from children. If you believe we have collected information 
+              from a child, please contact us immediately.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">10. Changes to This Policy</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              We may update this privacy policy from time to time. We will notify you of any material 
+              changes by posting the new policy on this page and updating the "Last updated" date. 
+              Your continued use of the system after changes become effective constitutes acceptance of those changes.
+            </p>
+
+            <h4 className="text-base font-semibold text-gray-800 mb-3">11. Contact Us</h4>
+            <p className="text-sm text-gray-700 mb-4">
+              If you have any questions, concerns, or requests regarding this privacy policy or how we 
+              handle your personal information, please contact your system administrator or IT support team.
+            </p>
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                <strong>Last updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                <strong>Applicable jurisdiction:</strong> Republic of the Philippines
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
