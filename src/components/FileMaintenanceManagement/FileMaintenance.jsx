@@ -1,8 +1,8 @@
 // src/components/FileMaintenance/FileMaintenance.jsx
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/config";
-import { Plus, Trash2, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, Trash2, Save, RefreshCw, AlertCircle, CheckCircle, Lock } from "lucide-react";
 
 const ENUM_DOC_COLL = "maintenance";
 const ENUM_DOC_ID = "rice_varieties_enums";
@@ -61,6 +61,82 @@ const FileMaintenance = () => {
   const [switchGuard, setSwitchGuard] = useState({ open: false, next: null });
 
   const markDirty = () => setIsDirty(true);
+
+  // Check if an item is being used in the database
+  const checkItemUsage = async (itemType, itemValue) => {
+    try {
+      // Define all collections and their field mappings
+      const usageChecks = {
+        seasons: [
+          { collection: 'rice_seed_varieties', field: 'season' },
+          { collection: 'rice_local_pests', field: 'season' },
+          { collection: 'rice_local_diseases', field: 'season' }
+        ],
+        plantingMethods: [
+          { collection: 'rice_seed_varieties', field: 'plantingMethod' },
+          { collection: 'rice_local_pests', field: 'plantingMethod' },
+          { collection: 'rice_local_diseases', field: 'plantingMethod' }
+        ],
+        environments: [
+          { collection: 'rice_seed_varieties', field: 'environment' },
+          { collection: 'rice_local_pests', field: 'environment' },
+          { collection: 'rice_local_diseases', field: 'environment' }
+        ],
+        yearReleases: [
+          { collection: 'rice_seed_varieties', field: 'yearRelease' },
+          { collection: 'rice_local_pests', field: 'yearRelease' },
+          { collection: 'rice_local_diseases', field: 'yearRelease' }
+        ],
+        securityQuestions: [
+          { collection: 'accounts', field: 'securityQuestion' }
+        ]
+      };
+
+      const checks = usageChecks[itemType];
+      if (!checks) return false;
+
+      // Check each collection for usage
+      for (const check of checks) {
+        try {
+          const q = collection(db, check.collection);
+          const querySnapshot = await getDocs(q);
+          
+          console.log(`Checking ${check.collection}.${check.field} for "${itemValue}" - found ${querySnapshot.docs.length} documents`);
+          
+          for (const doc of querySnapshot.docs) {
+            const data = doc.data();
+            const fieldValue = data[check.field];
+            
+            // Handle different data types
+            if (fieldValue === itemValue) {
+              console.log(`Found direct match: ${itemValue} in ${check.collection}.${check.field}`);
+              return true; // Direct match
+            }
+            
+            // Handle array fields (like seasons)
+            if (Array.isArray(fieldValue) && fieldValue.includes(itemValue)) {
+              console.log(`Found array match: ${itemValue} in ${check.collection}.${check.field}`);
+              return true; // Value found in array
+            }
+            
+            // Handle string fields that might contain the value
+            if (typeof fieldValue === 'string' && fieldValue.toLowerCase().includes(itemValue.toLowerCase())) {
+              console.log(`Found string match: ${itemValue} in ${check.collection}.${check.field}`);
+              return true; // Value found in string
+            }
+          }
+        } catch (collectionError) {
+          console.warn(`Error checking collection ${check.collection}:`, collectionError);
+          // Continue to next collection
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking item usage:', error);
+      return false; // If error, allow deletion to be safe
+    }
+  };
 
   // Toast helper
   const showToast = (ok, msg) => {
@@ -222,7 +298,22 @@ const FileMaintenance = () => {
     showToast(true, "Added (not saved).");
   };
 
-  const askRemove = (keyName, value) => {
+  const askRemove = async (keyName, value) => {
+    // Check if the item is being used
+    const isUsed = await checkItemUsage(keyName, value);
+    
+    if (isUsed) {
+      const collectionNames = {
+        seasons: 'rice varieties, pests, or diseases',
+        plantingMethods: 'rice varieties, pests, or diseases',
+        environments: 'rice varieties, pests, or diseases',
+        yearReleases: 'rice varieties, pests, or diseases',
+        securityQuestions: 'user accounts'
+      };
+      showToast(false, `Cannot delete "${value}" - it's currently being used in ${collectionNames[keyName] || 'the system'}.`);
+      return;
+    }
+    
     setConfirmTarget({ key: keyName, value });
     setConfirmOpen(true);
   };
@@ -279,7 +370,15 @@ const FileMaintenance = () => {
     showToast(true, "Added (not saved).");
   };
 
-  const askRemoveSecurityQuestion = (value) => {
+  const askRemoveSecurityQuestion = async (value) => {
+    // Check if the security question is being used
+    const isUsed = await checkItemUsage('securityQuestions', value);
+    
+    if (isUsed) {
+      showToast(false, `Cannot delete "${value}" - it's currently being used in user accounts.`);
+      return;
+    }
+    
     setConfirmTargetAcc({ value });
     setConfirmOpenAcc(true);
   };
@@ -305,6 +404,103 @@ const FileMaintenance = () => {
       console.error("Accounts save failed:", e);
       showToast(false, e?.message || "Save failed.");
     }
+  };
+
+  // Item row component that checks usage and shows appropriate UI
+  const ItemRow = ({ item, keyName, isNewItem, onRemove }) => {
+    const [isUsed, setIsUsed] = useState(false);
+    const [checkingUsage, setCheckingUsage] = useState(true);
+
+    useEffect(() => {
+      const checkUsage = async () => {
+        setCheckingUsage(true);
+        const used = await checkItemUsage(keyName, item);
+        setIsUsed(used);
+        setCheckingUsage(false);
+      };
+      checkUsage();
+    }, [keyName, item]);
+
+    return (
+      <li className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+        <div className="flex items-center gap-3">
+          <span className={`text-sm px-3 py-1 rounded-md border font-medium ${
+            isNewItem 
+              ? 'bg-green-100 border-green-300 text-green-800' 
+              : 'bg-white border-gray-300 text-gray-700'
+          }`}>
+            {item}
+            {isNewItem && <span className="ml-2 text-xs text-green-600">●</span>}
+          </span>
+          {checkingUsage ? (
+            <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+          ) : isUsed ? (
+            <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+              <Lock className="w-3 h-3" />
+              <span>In Use</span>
+            </div>
+          ) : null}
+        </div>
+        <button
+          onClick={onRemove}
+          disabled={isUsed || checkingUsage}
+          className={`rounded-lg p-2 transition-colors ${
+            isUsed || checkingUsage
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+          }`}
+          title={isUsed ? 'Cannot delete - item is in use' : 'Remove'}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </li>
+    );
+  };
+
+  // Security question row component
+  const SecurityQuestionRow = ({ question, onRemove }) => {
+    const [isUsed, setIsUsed] = useState(false);
+    const [checkingUsage, setCheckingUsage] = useState(true);
+
+    useEffect(() => {
+      const checkUsage = async () => {
+        setCheckingUsage(true);
+        const used = await checkItemUsage('securityQuestions', question);
+        setIsUsed(used);
+        setCheckingUsage(false);
+      };
+      checkUsage();
+    }, [question]);
+
+    return (
+      <li className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+        <div className="flex items-center gap-3">
+          <span className="text-sm px-3 py-1 rounded-md border font-medium bg-white border-gray-300 text-gray-700">
+            {question}
+          </span>
+          {checkingUsage ? (
+            <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+          ) : isUsed ? (
+            <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+              <Lock className="w-3 h-3" />
+              <span>In Use</span>
+            </div>
+          ) : null}
+        </div>
+        <button
+          onClick={onRemove}
+          disabled={isUsed || checkingUsage}
+          className={`rounded-lg p-2 transition-colors ${
+            isUsed || checkingUsage
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+          }`}
+          title={isUsed ? 'Cannot delete - question is in use' : 'Remove'}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </li>
+    );
   };
 
   // Variation card with "view more" using draft
@@ -369,23 +565,13 @@ const FileMaintenance = () => {
                 // Check if this item is newly added (not in server data)
                 const isNewItem = !serverList.includes(v);
                 return (
-                  <li key={`${keyName}-${v}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                    <span className={`text-sm px-3 py-1 rounded-md border font-medium ${
-                      isNewItem 
-                        ? 'bg-green-100 border-green-300 text-green-800' 
-                        : 'bg-white border-gray-300 text-gray-700'
-                    }`}>
-                      {v}
-                      {isNewItem && <span className="ml-2 text-xs text-green-600">●</span>}
-                    </span>
-                    <button
-                      onClick={() => askRemove(keyName, v)}
-                      className="text-red-600 hover:text-red-800 rounded-lg p-2 hover:bg-red-50 transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </li>
+                  <ItemRow 
+                    key={`${keyName}-${v}`}
+                    item={v}
+                    keyName={keyName}
+                    isNewItem={isNewItem}
+                    onRemove={() => askRemove(keyName, v)}
+                  />
                 );
               })}
             </ul>
@@ -464,29 +650,13 @@ const FileMaintenance = () => {
           </div>
         ) : sqDraft.length ? (
           <ul className="space-y-2 min-h-[160px]">
-            {sqDraft.map((q) => {
-              // Check if this question is newly added (not in server data)
-              const isNewItem = !securityQuestions.includes(q);
-              return (
-                <li key={`sq-${q}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                  <span className={`text-sm px-3 py-1 rounded-md border font-medium ${
-                    isNewItem 
-                      ? 'bg-blue-100 border-blue-300 text-blue-800' 
-                      : 'bg-white border-gray-300 text-gray-700'
-                  }`}>
-                    {q}
-                    {isNewItem && <span className="ml-2 text-xs text-blue-600">●</span>}
-                  </span>
-                  <button
-                    onClick={() => askRemoveSecurityQuestion(q)}
-                    className="text-red-600 hover:text-red-800 rounded-lg p-2 hover:bg-red-50 transition-colors"
-                    title="Remove"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </li>
-              );
-            })}
+            {sqDraft.map((q) => (
+              <SecurityQuestionRow 
+                key={`sq-${q}`}
+                question={q}
+                onRemove={() => askRemoveSecurityQuestion(q)}
+              />
+            ))}
           </ul>
         ) : (
           <p className="text-sm text-gray-500">No security questions yet.</p>
