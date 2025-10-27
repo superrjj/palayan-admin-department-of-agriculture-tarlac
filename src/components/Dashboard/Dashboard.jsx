@@ -232,91 +232,128 @@ const Dashboard = () => {
     }
   };
 
-  // Build monthly series for top diseases from users/*/predictions
+  // Build monthly series for top diseases from users/*/predictions_result and users/*/treatment_notes
   useEffect(() => {
     setStatsLoading(true);
     setStatsError(null);
 
-    let unsub = onSnapshot(
-      query(collectionGroup(db, 'predictions_result'), orderBy('timestamp', 'desc'), fbLimit(3000)),
-      (snap) => {
-        const byDiseaseMonthly = new Map();
-        const totals = new Map();
-        const currentYear = new Date().getFullYear();
-        snap.docs.forEach((doc) => {
-          const data = doc.data() || {};
-          const name = (data.diseaseName || data.name || 'Unknown').trim() || 'Unknown';
-          let date;
-          try {
-            const ts = data.timestamp;
-            date = ts?.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : new Date());
-          } catch {
-            date = new Date();
-          }
-          if (date.getFullYear() !== currentYear) return;
-          const m = Math.min(11, Math.max(0, date.getMonth()));
-          if (!byDiseaseMonthly.has(name)) byDiseaseMonthly.set(name, Array(12).fill(0));
-          const arr = byDiseaseMonthly.get(name);
-          arr[m] += 1;
-          totals.set(name, (totals.get(name) || 0) + 1);
-        });
-        const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
-        const series = ranked.map(([name, total], idx) => ({
-          name,
-          color: PALETTE[idx % PALETTE.length],
-          data: byDiseaseMonthly.get(name) || Array(12).fill(0),
-          total
-        }));
-        setDiseaseSeries(series);
-        setStatsLoading(false);
-      },
-      (err) => {
-        console.warn('predictions orderBy fallback:', err?.code || err?.message);
-        if (unsub) unsub();
-        unsub = onSnapshot(
-          query(collectionGroup(db, 'predictions_result'), fbLimit(3000)),
-          (snap2) => {
-            const byDiseaseMonthly = new Map();
-            const totals = new Map();
-            const currentYear = new Date().getFullYear();
-            snap2.docs.forEach((doc) => {
-              const data = doc.data() || {};
-              const name = (data.diseaseName || data.name || 'Unknown').trim() || 'Unknown';
-              let date;
-              try {
-                const ts = data.timestamp;
-                date = ts?.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : new Date());
-              } catch {
-                date = new Date();
-              }
-              if (date.getFullYear() !== currentYear) return;
-              const m = Math.min(11, Math.max(0, date.getMonth()));
-              if (!byDiseaseMonthly.has(name)) byDiseaseMonthly.set(name, Array(12).fill(0));
-              const arr = byDiseaseMonthly.get(name);
-              arr[m] += 1;
-              totals.set(name, (totals.get(name) || 0) + 1);
-            });
-            const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
-            const series = ranked.map(([name, total], idx) => ({
-              name,
-              color: PALETTE[idx % PALETTE.length],
-              data: byDiseaseMonthly.get(name) || Array(12).fill(0),
-              total
-            }));
-            setDiseaseSeries(series);
-            setStatsLoading(false);
-          },
-          (err2) => {
-            console.error('predictions listen error:', err2);
-            setDiseaseSeries([]);
-            setStatsError('No detection data');
-            setStatsLoading(false);
-          }
-        );
-      }
-    );
+    let unsubPredictions, unsubTreatments;
+    let predictionData = [];
+    let treatmentData = [];
 
-    return () => { if (unsub) unsub(); };
+    const processAllData = () => {
+      const byDiseaseMonthly = new Map();
+      const totals = new Map();
+      const currentYear = new Date().getFullYear();
+
+      // Process predictions_result data
+      predictionData.forEach((doc) => {
+        const data = doc.data() || {};
+        const name = (data.diseaseName || data.name || 'Unknown').trim() || 'Unknown';
+        let date;
+        try {
+          const ts = data.timestamp;
+          date = ts?.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : new Date());
+        } catch {
+          date = new Date();
+        }
+        if (date.getFullYear() !== currentYear) return;
+        const m = Math.min(11, Math.max(0, date.getMonth()));
+        if (!byDiseaseMonthly.has(name)) byDiseaseMonthly.set(name, Array(12).fill(0));
+        const arr = byDiseaseMonthly.get(name);
+        arr[m] += 1;
+        totals.set(name, (totals.get(name) || 0) + 1);
+      });
+
+      // Process treatment_notes data
+      treatmentData.forEach((doc) => {
+        const data = doc.data() || {};
+        const name = (data.diseaseName || data.name || 'Unknown').trim() || 'Unknown';
+        let date;
+        try {
+          const ts = data.timestamp;
+          date = ts?.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : new Date());
+        } catch {
+          date = new Date();
+        }
+        if (date.getFullYear() !== currentYear) return;
+        const m = Math.min(11, Math.max(0, date.getMonth()));
+        if (!byDiseaseMonthly.has(name)) byDiseaseMonthly.set(name, Array(12).fill(0));
+        const arr = byDiseaseMonthly.get(name);
+        arr[m] += 1;
+        totals.set(name, (totals.get(name) || 0) + 1);
+      });
+
+      const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 2);
+      const series = ranked.map(([name, total], idx) => ({
+        name,
+        color: PALETTE[idx % PALETTE.length],
+        data: byDiseaseMonthly.get(name) || Array(12).fill(0),
+        total
+      }));
+      setDiseaseSeries(series);
+      setStatsLoading(false);
+    };
+
+    try {
+      // Fetch from predictions_result
+      unsubPredictions = onSnapshot(
+        query(collectionGroup(db, 'predictions_result'), orderBy('timestamp', 'desc'), fbLimit(3000)),
+        (snap) => {
+          predictionData = snap.docs;
+          processAllData();
+        },
+        (err) => {
+          console.warn('predictions_result orderBy error:', err?.code || err?.message);
+          unsubPredictions = onSnapshot(
+            query(collectionGroup(db, 'predictions_result'), fbLimit(3000)),
+            (snap2) => {
+              predictionData = snap2.docs;
+              processAllData();
+            },
+            (err2) => {
+              console.warn('predictions_result fallback error:', err2);
+              predictionData = [];
+              processAllData();
+            }
+          );
+        }
+      );
+
+      // Fetch from treatment_notes
+      unsubTreatments = onSnapshot(
+        query(collectionGroup(db, 'treatment_notes'), orderBy('timestamp', 'desc'), fbLimit(3000)),
+        (snap) => {
+          treatmentData = snap.docs;
+          processAllData();
+        },
+        (err) => {
+          console.warn('treatment_notes orderBy error:', err?.code || err?.message);
+          unsubTreatments = onSnapshot(
+            query(collectionGroup(db, 'treatment_notes'), fbLimit(3000)),
+            (snap2) => {
+              treatmentData = snap2.docs;
+              processAllData();
+            },
+            (err2) => {
+              console.warn('treatment_notes fallback error:', err2);
+              treatmentData = [];
+              processAllData();
+            }
+          );
+        }
+      );
+    } catch (error) {
+      console.error('Error setting up disease stats listeners:', error);
+      setDiseaseSeries([]);
+      setStatsError('No detection data');
+      setStatsLoading(false);
+    }
+
+    return () => {
+      if (unsubPredictions) unsubPredictions();
+      if (unsubTreatments) unsubTreatments();
+    };
   }, []);
 
   const chartMaxY = useMemo(() => {
