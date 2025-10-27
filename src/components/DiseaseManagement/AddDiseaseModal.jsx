@@ -133,6 +133,49 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       return;
     }
 
+    // Check for duplicate name across all collections
+    try {
+      const { collection, query, where, getDocs } = await import("firebase/firestore");
+      const { db } = await import("../../firebase/config");
+      
+      const nameToCheck = formData.name.trim();
+      
+      // Check in rice_seed_varieties
+      const varietiesQuery = query(
+        collection(db, "rice_seed_varieties"),
+        where("varietyName", "==", nameToCheck)
+      );
+      const varietiesSnapshot = await getDocs(varietiesQuery);
+      
+      // Check in rice_local_pests
+      const pestsQuery = query(
+        collection(db, "rice_local_pests"),
+        where("name", "==", nameToCheck)
+      );
+      const pestsSnapshot = await getDocs(pestsQuery);
+      
+      // Check in rice_local_diseases
+      const diseasesQuery = query(
+        collection(db, "rice_local_diseases"),
+        where("name", "==", nameToCheck)
+      );
+      const diseasesSnapshot = await getDocs(diseasesQuery);
+      
+      // If editing, exclude current disease from duplicate check
+      const isDuplicate = 
+        varietiesSnapshot.docs.length > 0 ||
+        pestsSnapshot.docs.length > 0 ||
+        diseasesSnapshot.docs.some(doc => isEdit ? doc.id !== diseaseData?.id : true);
+      
+      if (isDuplicate) {
+        showToast(`The name "${nameToCheck}" is already used by a variety, pest, or disease. Please choose a different name.`);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking for duplicate name:", error);
+      // Continue with submission if check fails
+    }
+
     setUploading(true);
     try {
       let imageUrls = [];

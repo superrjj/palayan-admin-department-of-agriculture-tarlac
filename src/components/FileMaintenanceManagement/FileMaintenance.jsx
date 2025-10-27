@@ -1,8 +1,9 @@
 // src/components/FileMaintenance/FileMaintenance.jsx
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { Plus, Trash2, Save, RefreshCw, AlertCircle, CheckCircle, Lock } from "lucide-react";
+import { useRole } from "../../contexts/RoleContext";
 
 const ENUM_DOC_COLL = "maintenance";
 const ENUM_DOC_ID = "rice_varieties_enums";
@@ -11,6 +12,13 @@ const ACCOUNTS_ENUM_DOC_ID = "accounts_enums";
 const FileMaintenance = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { userInfo } = useRole();
+  const [currentUser, setCurrentUser] = useState({
+    id: 'default_user',
+    fullname: 'System User',
+    username: 'system',
+    email: 'system@example.com'
+  });
 
   // Server data (reference)
   const [data, setData] = useState({
@@ -61,6 +69,54 @@ const FileMaintenance = () => {
   const [switchGuard, setSwitchGuard] = useState({ open: false, next: null });
 
   const markDirty = () => setIsDirty(true);
+
+  // Get current user for audit logs
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const adminToken = localStorage.getItem("admin_token");
+        const sessionId = localStorage.getItem("session_id");
+        if (adminToken && sessionId) {
+          const userDoc = await getDoc(doc(db, "accounts", adminToken));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.currentSession === sessionId) {
+              setCurrentUser({
+                id: userData.id || adminToken,
+                fullname: userData.fullname || 'Unknown User',
+                username: userData.username || 'unknown',
+                email: userData.email || 'unknown@example.com'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  // Audit logging function
+  const logAuditAction = async (action, collectionName, documentName, description, changes = null) => {
+    try {
+      console.log('Logging audit action:', { action, collectionName, documentName, currentUser });
+      await addDoc(collection(db, "audit_logs"), {
+        action,
+        collection: collectionName, // Use the passed collectionName here
+        documentName,
+        description,
+        changes,
+        userId: currentUser.id,
+        userName: currentUser.fullname,
+        userEmail: currentUser.email,
+        timestamp: new Date()
+      });
+      console.log('Audit log created successfully');
+    } catch (error) {
+      console.error('Failed to log audit action:', error);
+    }
+  };
 
   // Check if an item is being used in the database
   const checkItemUsage = async (itemType, itemValue) => {
@@ -296,6 +352,14 @@ const FileMaintenance = () => {
     setInputs((prev) => ({ ...prev, [keyName]: "" }));
     markDirty();
     showToast(true, "Added (not saved).");
+    
+    // Log audit action
+    logAuditAction(
+      'ADD',
+      'maintenance',
+      `${keyName} - ${val}`,
+      `Added "${val}" to ${keyName}`
+    );
   };
 
   const askRemove = async (keyName, value) => {
@@ -326,6 +390,14 @@ const FileMaintenance = () => {
     setConfirmTarget(null);
     markDirty();
     showToast(true, "Removed (not saved).");
+    
+    // Log audit action
+    logAuditAction(
+      'REMOVE',
+      'maintenance',
+      `${key} - ${value}`,
+      `Removed "${value}" from ${key}`
+    );
   };
 
   // VARIETY: Save from draft to Firebase
@@ -335,17 +407,16 @@ const FileMaintenance = () => {
       const ref = doc(db, ENUM_DOC_COLL, ENUM_DOC_ID);
       const sanitize = (arr) =>
         Array.from(new Set((arr || []).map((v) => String(v).trim()).filter(Boolean)));
-      await setDoc(
-        ref,
-        {
-          seasons: sanitize(draft.seasons),
-          plantingMethods: sanitize(draft.plantingMethods),
-          environments: sanitize(draft.environments),
-          yearReleases: sanitize(draft.yearReleases),
-          updatedAt: serverTimestamp()
-        },
-        { merge: true }
-      );
+      
+      const newData = {
+        seasons: sanitize(draft.seasons),
+        plantingMethods: sanitize(draft.plantingMethods),
+        environments: sanitize(draft.environments),
+        yearReleases: sanitize(draft.yearReleases),
+        updatedAt: serverTimestamp()
+      };
+      
+      await setDoc(ref, newData, { merge: true });
       setIsDirty(false);
       showToast(true, "Saved.");
     } catch (e) {
@@ -368,6 +439,14 @@ const FileMaintenance = () => {
     setSqInput("");
     markDirty();
     showToast(true, "Added (not saved).");
+    
+    // Log audit action
+    logAuditAction(
+      'ADD',
+      'maintenance',
+      `security_questions - ${val}`,
+      `Added security question "${val}"`
+    );
   };
 
   const askRemoveSecurityQuestion = async (value) => {
@@ -391,13 +470,22 @@ const FileMaintenance = () => {
     setConfirmTargetAcc(null);
     markDirty();
     showToast(true, "Removed (not saved).");
+    
+    // Log audit action
+    logAuditAction(
+      'REMOVE',
+      'maintenance',
+      `security_questions - ${value}`,
+      `Removed security question "${value}"`
+    );
   };
 
   const saveAccounts = async () => {
     try {
       const ref = doc(db, ENUM_DOC_COLL, ACCOUNTS_ENUM_DOC_ID);
       const sanitize = (arr) => Array.from(new Set((arr || []).map((v) => String(v).trim()).filter(Boolean)));
-      await setDoc(ref, { securityQuestions: sanitize(sqDraft), updatedAt: serverTimestamp() }, { merge: true });
+      const newData = { securityQuestions: sanitize(sqDraft), updatedAt: serverTimestamp() };
+      await setDoc(ref, newData, { merge: true });
       setIsDirty(false);
       showToast(true, "Saved.");
     } catch (e) {

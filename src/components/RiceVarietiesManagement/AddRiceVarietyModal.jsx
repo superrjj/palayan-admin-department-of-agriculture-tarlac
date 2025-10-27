@@ -146,7 +146,53 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
     setConfirmOpen(false);
     try {
       setSubmitting(true);
-      await onSave(form, getRecordId(varietyData));
+      
+      // Check for duplicate name across all collections
+      const { collection, query, where, getDocs } = await import("firebase/firestore");
+      const { db } = await import("../../firebase/config");
+      
+      const nameToCheck = form.varietyName.trim();
+      const currentId = getRecordId(varietyData);
+      
+      // Check in rice_seed_varieties
+      const varietiesQuery = query(
+        collection(db, "rice_seed_varieties"),
+        where("varietyName", "==", nameToCheck)
+      );
+      const varietiesSnapshot = await getDocs(varietiesQuery);
+      
+      // Check in rice_local_pests
+      const pestsQuery = query(
+        collection(db, "rice_local_pests"),
+        where("name", "==", nameToCheck)
+      );
+      const pestsSnapshot = await getDocs(pestsQuery);
+      
+      // Check in rice_local_diseases
+      const diseasesQuery = query(
+        collection(db, "rice_local_diseases"),
+        where("name", "==", nameToCheck)
+      );
+      const diseasesSnapshot = await getDocs(diseasesQuery);
+      
+      // If editing, exclude current variety from duplicate check
+      const isDuplicate = 
+        varietiesSnapshot.docs.some(doc => currentId ? doc.id !== currentId : true) ||
+        pestsSnapshot.docs.length > 0 ||
+        diseasesSnapshot.docs.length > 0;
+      
+      if (isDuplicate) {
+        setResult({
+          title: 'Duplicate Name',
+          message: `The name "${nameToCheck}" is already used by a variety, pest, or disease. Please choose a different name.`,
+          ok: false
+        });
+        setResultOpen(true);
+        setSubmitting(false);
+        return;
+      }
+      
+      await onSave(form, currentId);
       setResult({
         title: varietyData ? 'Updated!' : 'Saved!',
         message: `Rice variety ${form.varietyName || ''} has been ${varietyData ? 'updated' : 'saved'} successfully.`,

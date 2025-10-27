@@ -234,6 +234,7 @@ const History = () => {
     if (collection.includes('pest')) return { path: '/dashboard/rice_pests', focusId: id };
     if (collection.includes('disease')) return { path: '/dashboard/rice_diseases', focusId: id };
     if (collection.includes('account') || collection.includes('accounts')) return { path: '/dashboard/accounts', focusId: id };
+    if (collection.includes('maintenance')) return { path: '/dashboard/file_maintenance', focusId: id };
     return null;
   };
 

@@ -16,6 +16,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [toast, setToast] = useState(null); // { type: 'error' | 'success', msg: string }
   const isEdit = !!pestData;
 
   const handleChange = (e) => {
@@ -23,10 +24,16 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const showToast = (msg, type = 'error', ms = 2200) => {
+    setToast({ type, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), ms);
+  };
+
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length + images.length > 10) {
-      alert("You can upload a maximum of 10 images.");
+      showToast("You can upload a maximum of 10 images.");
       return;
     }
     setImages((prev) => [...prev, ...files]);
@@ -69,13 +76,56 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Pest name is required.");
+      showToast("Pest name is required.");
       return;
     }
 
     if (!isEdit && images.length === 0) {
-      alert("Please upload at least 1 image for new pests.");
+      showToast("Please upload at least 1 image for new pests.");
       return;
+    }
+
+    // Check for duplicate name across all collections
+    try {
+      const { collection, query, where, getDocs } = await import("firebase/firestore");
+      const { db } = await import("../../firebase/config");
+      
+      const nameToCheck = formData.name.trim();
+      
+      // Check in rice_seed_varieties
+      const varietiesQuery = query(
+        collection(db, "rice_seed_varieties"),
+        where("varietyName", "==", nameToCheck)
+      );
+      const varietiesSnapshot = await getDocs(varietiesQuery);
+      
+      // Check in rice_local_pests
+      const pestsQuery = query(
+        collection(db, "rice_local_pests"),
+        where("name", "==", nameToCheck)
+      );
+      const pestsSnapshot = await getDocs(pestsQuery);
+      
+      // Check in rice_local_diseases
+      const diseasesQuery = query(
+        collection(db, "rice_local_diseases"),
+        where("name", "==", nameToCheck)
+      );
+      const diseasesSnapshot = await getDocs(diseasesQuery);
+      
+      // If editing, exclude current pest from duplicate check
+      const isDuplicate = 
+        varietiesSnapshot.docs.length > 0 ||
+        pestsSnapshot.docs.some(doc => isEdit ? doc.id !== pestData?.id : true) ||
+        diseasesSnapshot.docs.length > 0;
+      
+      if (isDuplicate) {
+        showToast(`The name "${nameToCheck}" is already used by a variety, pest, or disease. Please choose a different name.`);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking for duplicate name:", error);
+      // Continue with submission if check fails
     }
 
     setUploading(true);
@@ -105,7 +155,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
       setImages([]);
       setUploadProgress(0);
     } catch (error) {
-      alert(`Error saving pest: ${error.message}`);
+      showToast(`Error saving pest: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -287,6 +337,24 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
           {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
         </button>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-[60]">
+          <div className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 border ${
+            toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'
+          }`}>
+            <AlertCircle className="w-5 h-5" />
+            <span className="text-sm font-medium">{toast.msg}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-1 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
