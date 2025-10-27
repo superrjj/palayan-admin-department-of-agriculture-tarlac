@@ -44,7 +44,8 @@ const History = () => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      timeZone: 'Asia/Manila'
     });
   };
 
@@ -127,17 +128,21 @@ const History = () => {
       let matchesDate = true;
       if (dateRange !== 'ALL') {
         const now = new Date();
-        const logDate = new Date(log.timestamp);
-        switch (dateRange) {
-          case 'TODAY':
-            matchesDate = logDate.toDateString() === now.toDateString();
-            break;
-          case 'WEEK':
-            matchesDate = (now - logDate) / (1000 * 60 * 60 * 24) <= 7;
-            break;
-          case 'MONTH':
-            matchesDate = (now - logDate) / (1000 * 60 * 60 * 24) <= 30;
-            break;
+        const logDate = toDateSafe(log.timestamp);
+        if (!logDate || isNaN(logDate.getTime())) {
+          matchesDate = false;
+        } else {
+          switch (dateRange) {
+            case 'TODAY':
+              matchesDate = logDate.toDateString() === now.toDateString();
+              break;
+            case 'WEEK':
+              matchesDate = (now - logDate) / (1000 * 60 * 60 * 24) <= 7;
+              break;
+            case 'MONTH':
+              matchesDate = (now - logDate) / (1000 * 60 * 60 * 24) <= 30;
+              break;
+          }
         }
       }
       return matchesSearch && matchesAction && matchesCollection && matchesUser && matchesDate;
@@ -300,7 +305,7 @@ const History = () => {
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Clock className="w-4 h-4" />
                   <span title={formatTimestamp(log.timestamp)}>
-                    {formatShortRelative(log.timestamp, nowTick)}
+                    {formatTimestamp(log.timestamp)}
                   </span>
                 </div>
               </div>
