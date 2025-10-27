@@ -527,20 +527,22 @@ const FileMaintenance = () => {
             : 'bg-gradient-to-r from-emerald-500 via-green-400 to-lime-400 opacity-80'
         }`} />
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-            <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
-              hasUnsavedChanges 
-                ? 'bg-green-100 text-green-800 border-green-200' 
-                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-            }`}>
-              {(list || []).length} items
-            </span>
-            {hasUnsavedChanges && (
-              <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
-                Unsaved Changes
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
+                hasUnsavedChanges 
+                  ? 'bg-green-100 text-green-800 border-green-200' 
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+              }`}>
+                {(list || []).length} items
               </span>
-            )}
+              {hasUnsavedChanges && (
+                <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
+                  Unsaved Changes
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex gap-3">
             <input
@@ -613,20 +615,22 @@ const FileMaintenance = () => {
             : 'bg-gradient-to-r from-blue-500 via-indigo-400 to-purple-400 opacity-80'
         }`} />
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-lg font-bold text-gray-800">🔐 Security Questions</h3>
-            <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
-              hasUnsavedChanges 
-                ? 'bg-blue-100 text-blue-800 border-blue-200' 
-                : 'bg-indigo-50 text-indigo-700 border-indigo-100'
-            }`}>
-              {sqDraft.length} questions
-            </span>
-            {hasUnsavedChanges && (
-              <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
-                Unsaved Changes
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
+                hasUnsavedChanges 
+                  ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+              }`}>
+                {sqDraft.length} questions
               </span>
-            )}
+              {hasUnsavedChanges && (
+                <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
+                  Unsaved Changes
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex gap-3">
             <input
@@ -742,10 +746,10 @@ const FileMaintenance = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {section("🌤️ Seasons", "seasons", "e.g., Dry Season")}
-              {section("🌱 Planting Methods", "plantingMethods", "e.g., Transplanting")}
-              {section("🌍 Environments", "environments", "e.g., Rainfed Lowland")}
-              {section("📅 Year Releases", "yearReleases", "e.g., 2025")}
+              {section("Seasons", "seasons", "e.g., Dry Season")}
+              {section("Planting Methods", "plantingMethods", "e.g., Transplanting")}
+              {section("Environments", "environments", "e.g., Rainfed Lowland")}
+              {section("Year Releases", "yearReleases", "e.g., 2025")}
             </div>
           )}
         </>

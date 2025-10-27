@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Wheat, Bug, Shield, Users, Activity, BarChart3 } from 'lucide-react';
 import { collection, collectionGroup, onSnapshot, query, where, orderBy, limit as fbLimit } from 'firebase/firestore';
 import { useRole } from '../../contexts/RoleContext';
@@ -8,6 +9,7 @@ const PALETTE = ['#f97316','#22c55e','#3b82f6','#eab308','#ef4444','#8b5cf6'];
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [totalAdmins, setTotalAdmins] = useState(0);
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalVarieties, setTotalVarieties] = useState(0);
@@ -23,6 +25,10 @@ const Dashboard = () => {
   const [statsError, setStatsError] = useState(null);
 
   const { userInfo } = useRole();
+
+  const handleCardClick = (path) => {
+    navigate(path);
+  };
 
   const activitiesUnsubRef = useRef(null);
   const triedFieldsRef = useRef([]);
@@ -325,7 +331,10 @@ const Dashboard = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Overview</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
+        <div 
+          className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500 cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+          onClick={() => handleCardClick('/dashboard/rice_varieties')}
+        >
           <div className="flex items-center">
             <Wheat className="h-8 w-8 text-green-500" />
             <div className="ml-4">
@@ -335,7 +344,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
+        <div 
+          className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500 cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+          onClick={() => handleCardClick('/dashboard/rice_pests')}
+        >
           <div className="flex items-center">
             <Bug className="h-8 w-8 text-red-500" />
             <div className="ml-4">
@@ -345,7 +357,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-orange-500">
+        <div 
+          className="bg-white p-6 rounded-lg shadow-md border-l-4 border-orange-500 cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+          onClick={() => handleCardClick('/dashboard/rice_diseases')}
+        >
           <div className="flex items-center">
             <Shield className="h-8 w-8 text-orange-500" />
             <div className="ml-4">
@@ -355,7 +370,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+        <div 
+          className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+          onClick={() => handleCardClick('/dashboard/accounts')}
+        >
           <div className="flex items-center">
             <Users className="h-8 w-8 text-blue-500" />
             <div className="ml-4">
