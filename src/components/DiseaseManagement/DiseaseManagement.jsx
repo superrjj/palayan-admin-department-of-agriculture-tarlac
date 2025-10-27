@@ -46,14 +46,6 @@ const DiseaseManagement = () => {
     if (!sortBy) setSortBy('name-asc');
   }, [sortBy, setSortBy]);
 
-  const [filters, setFilters] = useState({
-    yearRange: '',
-    season: '',
-    plantingMethod: '',
-    environment: '',
-    location: '',
-    recommendedInTarlac: '',
-  });
 
   // current user (for audit logs)
   const [currentUser, setCurrentUser] = useState({
@@ -334,8 +326,6 @@ const DiseaseManagement = () => {
         setSearchTerm={setSearchTerm}
         sortBy={sortBy}
         setSortBy={setSortBy}
-        filters={filters}
-        setFilters={setFilters}
       />
 
       {loading ? (

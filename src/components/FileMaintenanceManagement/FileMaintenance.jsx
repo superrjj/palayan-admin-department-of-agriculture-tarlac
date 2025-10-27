@@ -320,42 +320,42 @@ const FileMaintenance = () => {
     const hasUnsavedChanges = JSON.stringify(list.sort()) !== JSON.stringify(serverList.sort());
 
     return (
-      <div className={`relative overflow-hidden bg-white rounded-xl shadow border p-4 transition-colors ${
+      <div className={`relative overflow-hidden bg-white rounded-xl shadow-lg border p-6 transition-all duration-300 hover:shadow-xl ${
         hasUnsavedChanges 
-          ? 'border-green-300 bg-green-50/30' 
-          : 'border-gray-100'
+          ? 'border-green-300 bg-gradient-to-br from-green-50 to-emerald-50' 
+          : 'border-gray-100 hover:border-emerald-200'
       }`}>
-        <div className={`absolute inset-x-0 top-0 h-1 transition-colors ${
+        <div className={`absolute inset-x-0 top-0 h-1.5 transition-colors ${
           hasUnsavedChanges 
             ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-lime-500' 
-            : 'bg-gradient-to-r from-green-500 via-emerald-400 to-lime-400 opacity-80'
+            : 'bg-gradient-to-r from-emerald-500 via-green-400 to-lime-400 opacity-80'
         }`} />
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-800">{title}</h3>
-            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+            <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
               hasUnsavedChanges 
                 ? 'bg-green-100 text-green-800 border-green-200' 
                 : 'bg-emerald-50 text-emerald-700 border-emerald-100'
             }`}>
-              {(list || []).length}
+              {(list || []).length} items
             </span>
             {hasUnsavedChanges && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Unsaved
+              <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                Unsaved Changes
               </span>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <input
               value={inputs[keyName]}
               onChange={(e) => setInputs((p) => ({ ...p, [keyName]: e.target.value }))}
               placeholder={placeholder}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-green-500/40"
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 transition-colors min-w-48"
             />
             <button
               onClick={() => addItem(keyName)}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 shadow-sm hover:shadow flex items-center gap-1 text-sm transition"
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg hover:from-emerald-700 hover:to-green-700 active:from-emerald-800 active:to-green-800 shadow-md hover:shadow-lg flex items-center gap-2 text-sm transition-all duration-200"
             >
               <Plus className="w-4 h-4" /> Add
             </button>
@@ -364,23 +364,23 @@ const FileMaintenance = () => {
 
         {list.length ? (
           <>
-            <ul className="divide-y divide-gray-200 min-h-[140px]">
+            <ul className="space-y-2 min-h-[160px]">
               {visible.map((v) => {
                 // Check if this item is newly added (not in server data)
                 const isNewItem = !serverList.includes(v);
                 return (
-                  <li key={`${keyName}-${v}`} className="flex items-center justify-between py-2">
-                    <span className={`text-sm px-2 py-1 rounded-md border ${
+                  <li key={`${keyName}-${v}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                    <span className={`text-sm px-3 py-1 rounded-md border font-medium ${
                       isNewItem 
-                        ? 'bg-green-50 border-green-200 text-green-800 font-medium' 
-                        : 'bg-gray-50 border-gray-200 text-gray-700'
+                        ? 'bg-green-100 border-green-300 text-green-800' 
+                        : 'bg-white border-gray-300 text-gray-700'
                     }`}>
                       {v}
-                      {isNewItem && <span className="ml-1 text-xs">●</span>}
+                      {isNewItem && <span className="ml-2 text-xs text-green-600">●</span>}
                     </span>
                     <button
                       onClick={() => askRemove(keyName, v)}
-                      className="text-red-600 hover:text-red-800 rounded-md p-1 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-800 rounded-lg p-2 hover:bg-red-50 transition-colors"
                       title="Remove"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -416,42 +416,42 @@ const FileMaintenance = () => {
     const hasUnsavedChanges = JSON.stringify(sqDraft.sort()) !== JSON.stringify(securityQuestions.sort());
     
     return (
-      <div className={`relative overflow-hidden bg-white rounded-xl shadow border p-4 transition-colors ${
+      <div className={`relative overflow-hidden bg-white rounded-xl shadow-lg border p-6 transition-all duration-300 hover:shadow-xl ${
         hasUnsavedChanges 
-          ? 'border-green-300 bg-green-50/30' 
-          : 'border-gray-100'
+          ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50' 
+          : 'border-gray-100 hover:border-blue-200'
       }`}>
-        <div className={`absolute inset-x-0 top-0 h-1 transition-colors ${
+        <div className={`absolute inset-x-0 top-0 h-1.5 transition-colors ${
           hasUnsavedChanges 
-            ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-lime-500' 
-            : 'bg-gradient-to-r from-green-500 via-emerald-400 to-lime-400 opacity-80'
+            ? 'bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500' 
+            : 'bg-gradient-to-r from-blue-500 via-indigo-400 to-purple-400 opacity-80'
         }`} />
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-800">Security Questions</h3>
-            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-gray-800">🔐 Security Questions</h3>
+            <span className={`px-3 py-1 text-sm rounded-full border font-medium ${
               hasUnsavedChanges 
-                ? 'bg-green-100 text-green-800 border-green-200' 
-                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                : 'bg-indigo-50 text-indigo-700 border-indigo-100'
             }`}>
-              {sqDraft.length}
+              {sqDraft.length} questions
             </span>
             {hasUnsavedChanges && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Unsaved
+              <span className="px-3 py-1 text-sm rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                Unsaved Changes
               </span>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <input
               value={sqInput}
               onChange={(e) => setSqInput(e.target.value)}
               placeholder="e.g., What is your favorite teacher's name?"
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-green-500/40"
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-300 transition-colors min-w-64"
             />
             <button
               onClick={addSecurityQuestion}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 shadow-sm hover:shadow flex items-center gap-1 text-sm transition"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 active:from-blue-800 active:to-indigo-800 shadow-md hover:shadow-lg flex items-center gap-2 text-sm transition-all duration-200"
             >
               <Plus className="w-4 h-4" /> Add
             </button>
@@ -463,23 +463,23 @@ const FileMaintenance = () => {
             <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
           </div>
         ) : sqDraft.length ? (
-          <ul className="divide-y divide-gray-200 min-h-[140px]">
+          <ul className="space-y-2 min-h-[160px]">
             {sqDraft.map((q) => {
               // Check if this question is newly added (not in server data)
               const isNewItem = !securityQuestions.includes(q);
               return (
-                <li key={`sq-${q}`} className="flex items-center justify-between py-2">
-                  <span className={`text-sm px-2 py-1 rounded-md border ${
+                <li key={`sq-${q}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <span className={`text-sm px-3 py-1 rounded-md border font-medium ${
                     isNewItem 
-                      ? 'bg-green-50 border-green-200 text-green-800 font-medium' 
-                      : 'bg-gray-50 border-gray-200 text-gray-700'
+                      ? 'bg-blue-100 border-blue-300 text-blue-800' 
+                      : 'bg-white border-gray-300 text-gray-700'
                   }`}>
                     {q}
-                    {isNewItem && <span className="ml-1 text-xs">●</span>}
+                    {isNewItem && <span className="ml-2 text-xs text-blue-600">●</span>}
                   </span>
                   <button
                     onClick={() => askRemoveSecurityQuestion(q)}
-                    className="text-red-600 hover:text-red-800 rounded-md p-1 hover:bg-red-50"
+                    className="text-red-600 hover:text-red-800 rounded-lg p-2 hover:bg-red-50 transition-colors"
                     title="Remove"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -499,18 +499,28 @@ const FileMaintenance = () => {
   const selectorGrid = (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {[
-        { id: 'variety', label: 'Rice Variety', desc: 'Manage variety enums' },
-        { id: 'pest', label: 'Pest', desc: 'Manage pest-related lists' },
-        { id: 'disease', label: 'Rice Disease', desc: 'Manage disease-related lists' },
-        { id: 'accounts', label: 'Accounts', desc: 'Manage account-related lists' }
+        { id: 'variety', label: 'Rice Variety', desc: 'Manage variety enums', icon: '🌾' },
+        { id: 'accounts', label: 'Accounts', desc: 'Manage account-related lists', icon: '👤' }
       ].map((m) => (
         <button
           key={m.id}
           onClick={() => requestSwitchModule(m.id)}
-          className="relative text-left bg-white rounded-xl shadow p-6 md:p-7 hover:shadow-lg transition border border-gray-100 hover:border-emerald-200 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-emerald-400/40 min-h-28"
+          className="relative text-left bg-white rounded-xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-emerald-200 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-emerald-400/40 min-h-32 group"
         >
-          <div className="text-lg md:text-xl font-semibold text-gray-900">{m.label}</div>
-          <div className="text-sm md:text-base text-gray-600 mt-0.5">{m.desc}</div>
+          <div className="flex items-center gap-4">
+            <div className="text-4xl group-hover:scale-110 transition-transform duration-300">
+              {m.icon}
+            </div>
+            <div>
+              <div className="text-xl md:text-2xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                {m.label}
+              </div>
+              <div className="text-sm md:text-base text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
+                {m.desc}
+              </div>
+            </div>
+          </div>
+          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/5 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </button>
       ))}
     </div>
@@ -521,32 +531,32 @@ const FileMaintenance = () => {
     if (activeModule === 'variety') {
       return (
         <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => requestSwitchModule(null)}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
               >
-                ← Back
+                <span>←</span> Back
               </button>
               <div>
-                <h2 className="text-xl font-semibold">Rice Variety</h2>
-                <p className="text-gray-600 text-sm">Manage enumerations for varieties</p>
+                <h2 className="text-2xl font-bold text-gray-900">Rice Variety Management</h2>
+                <p className="text-gray-600">Manage enumerations for rice varieties</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={saveAll}
                 disabled={saving || loading || !isDirty}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-60 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200"
                 title={!isDirty ? 'No changes to save' : 'Save Changes'}
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-5 h-5" />
                 {saving ? "Saving..." : "Save Changes"}
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" /> Reload
               </button>
@@ -554,15 +564,18 @@ const FileMaintenance = () => {
           </div>
 
           {loading ? (
-            <div className="text-gray-600 flex items-center gap-2 mt-4">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
+            <div className="text-center py-12">
+              <div className="text-gray-600 flex items-center justify-center gap-3">
+                <RefreshCw className="w-6 h-6 animate-spin" /> 
+                <span className="text-lg">Loading variety data...</span>
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {section("Seasons", "seasons", "e.g., Dry")}
-              {section("Planting Methods", "plantingMethods", "e.g., Transplanting")}
-              {section("Environments", "environments", "e.g., Rainfed Lowland")}
-              {section("Year Releases", "yearReleases", "e.g., 2025")}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {section("🌤️ Seasons", "seasons", "e.g., Dry Season")}
+              {section("🌱 Planting Methods", "plantingMethods", "e.g., Transplanting")}
+              {section("🌍 Environments", "environments", "e.g., Rainfed Lowland")}
+              {section("📅 Year Releases", "yearReleases", "e.g., 2025")}
             </div>
           )}
         </>
@@ -572,67 +585,41 @@ const FileMaintenance = () => {
     if (activeModule === 'accounts') {
       return (
         <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => requestSwitchModule(null)}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
               >
-                ← Back
+                <span>←</span> Back
               </button>
               <div>
-                <h2 className="text-xl font-semibold">Accounts</h2>
-                <p className="text-gray-600 text-sm">Manage account-related lists</p>
+                <h2 className="text-2xl font-bold text-gray-900">Account Management</h2>
+                <p className="text-gray-600">Manage account-related settings and security questions</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={saveAccounts}
                 disabled={saving || !isDirty}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200"
                 title={!isDirty ? 'No changes to save' : 'Save Changes'}
               >
-                <Save className="w-4 h-4" /> Save Changes
+                <Save className="w-5 h-5" /> Save Changes
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" /> Reload
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {accountsSection}
-          </div>
-        </>
-      );
-    }
-
-    if (activeModule === 'pest' || activeModule === 'disease') {
-      const titles = { pest: "Pest", disease: "Rice Disease" };
-      return (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => requestSwitchModule(null)}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                ← Back
-              </button>
-              <div>
-                <h2 className="text-xl font-semibold">{titles[activeModule]}</h2>
-                <p className="text-gray-600 text-sm">Configure lists for {titles[activeModule].toLowerCase()}</p>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="lg:col-span-2">
+              {accountsSection}
             </div>
-          </div>
-
-          <div className="mt-4 bg-white rounded-xl shadow p-6 border border-gray-100">
-            <p className="text-sm text-gray-600">
-              Placeholder for {titles[activeModule]} maintenance. Wala pang code.
-            </p>
           </div>
         </>
       );

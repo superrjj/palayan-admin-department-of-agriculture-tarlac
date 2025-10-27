@@ -21,14 +21,6 @@ const PestManagement = () => {
     if (!sortBy) setSortBy('name-asc');
   }, [sortBy, setSortBy]);
 
-  const [filters, setFilters] = useState({
-    yearRange: '',
-    season: '',
-    plantingMethod: '',
-    environment: '',
-    location: '',
-    recommendedInTarlac: '',
-  });
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null); // { id, name }
@@ -308,8 +300,6 @@ const PestManagement = () => {
         setSearchTerm={setSearchTerm}
         sortBy={sortBy}
         setSortBy={setSortBy}
-        filters={filters}
-        setFilters={setFilters}
       />
 
       {loading ? (

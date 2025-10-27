@@ -1,9 +1,9 @@
 // src/components/Layout/Header.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Menu, Settings, LogOut, User, ChevronDown, Camera, Mail, Key, Phone, X, Loader2, ZoomIn, ZoomOut, Crop as CropIcon } from 'lucide-react';
+import { Menu, Settings, LogOut, User, ChevronDown, Camera, Mail, Phone, X, Loader2, ZoomIn, ZoomOut, Crop as CropIcon } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { getAuth, updateEmail, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, updateEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -295,7 +295,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
   const [photoPreview, setPhotoPreview] = useState(initialData.photoURL || '');
   const [photoFile, setPhotoFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [sendingReset, setSendingReset] = useState(false);
   const [error, setError] = useState('');
   const overlayRef = useRef(null);
 
@@ -467,22 +466,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
     }
   };
 
-  const handleSendPasswordReset = async () => {
-    setError('');
-    setSendingReset(true);
-    try {
-      const auth = getAuth();
-      const target = email || auth.currentUser?.email;
-      if (!target) throw new Error('No email available.');
-      await sendPasswordResetEmail(auth, target);
-    } catch (e) {
-      console.error(e);
-      setError(e.message || 'Failed to send reset email.');
-    } finally {
-      setSendingReset(false);
-    }
-  };
-
   return (
     <>
       <div
@@ -539,7 +522,7 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Full name</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Full name <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={fullname}
@@ -549,7 +532,7 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <input
@@ -581,7 +564,7 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Security Question</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Select a question</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Select a question <span className="text-red-500">*</span></label>
                   <select
                     value={securityQuestion}
                     onChange={(e) => setSecurityQuestion(e.target.value)}
@@ -594,7 +577,7 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Your answer</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Your answer <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={securityAnswer}
@@ -610,22 +593,6 @@ const AccountSettingsModal = ({ initialData, onClose, onSaved }) => {
               </p>
             </section>
 
-            <section className="mb-2">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Change Password / Update Email</h4>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleSendPasswordReset}
-                  disabled={sendingReset}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-60"
-                >
-                  {sendingReset ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-                  {sendingReset ? 'Sending...' : 'Send password reset email'}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                To change password, we will send a reset link to your email.
-              </p>
-            </section>
 
             {error && (
               <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
