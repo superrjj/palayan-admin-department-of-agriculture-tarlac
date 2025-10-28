@@ -36,7 +36,9 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
       showToast("You can upload a maximum of 10 images.");
       return;
     }
-    setImages((prev) => [...prev, ...files]);
+    convertHeicIfNeeded(files)
+      .then((converted) => setImages((prev) => [...prev, ...converted]))
+      .catch(() => setImages((prev) => [...prev, ...files]));
   };
 
   const handleRemoveImage = (index) => {
@@ -72,11 +74,54 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
     return Promise.all(uploadPromises);
   };
 
+  // Convert HEIC images to JPEG for preview and upload
+  const convertHeicIfNeeded = async (fileList) => {
+    const results = [];
+    try {
+      const mod = await import('heic2any');
+      const heic2any = mod.default || mod;
+      for (const file of fileList) {
+        const isHeic = /heic|heif/i.test(file.type) || /\.heic$|\.heif$/i.test(file.name);
+        if (!isHeic) {
+          results.push(file);
+          continue;
+        }
+        try {
+          const output = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+          const blobs = Array.isArray(output) ? output : [output];
+          for (let i = 0; i < blobs.length; i++) {
+            const name = (i === 0 ? file.name : file.name.replace(/(\.[^.]+)?$/, `_${i}$1`)).replace(/\.(heic|heif)$/i, '.jpg');
+            const converted = new File([blobs[i]], name, { type: 'image/jpeg' });
+            results.push(converted);
+          }
+        } catch (err) {
+          console.warn('HEIC conversion failed, using original file', err);
+          results.push(file);
+        }
+      }
+      return results;
+    } catch (err) {
+      console.warn('heic2any not available, skipping conversion');
+      return fileList;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
       showToast("Pest name is required.");
+      return;
+    }
+
+    // Letters only (allow spaces) validation for Pest Name and Scientific Name
+    const lettersOnly = /^[A-Za-z\s]+$/;
+    if (formData.name && !lettersOnly.test(formData.name.trim())) {
+      showToast("Pest name must contain letters only.");
+      return;
+    }
+    if (formData.scientificName && !lettersOnly.test(formData.scientificName.trim())) {
+      showToast("Scientific name must contain letters only.");
       return;
     }
 
@@ -272,7 +317,7 @@ const AddPestModal = ({ onClose, onSave, pestData = null }) => {
               <input
                 type="file"
                 multiple
-                accept="image/*"
+                  accept="image/*,.heic,.HEIC,.heif,.HEIF"
                 className="hidden"
                 onChange={handleImageChange}
                 disabled={uploading}

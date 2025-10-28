@@ -31,6 +31,11 @@ const AddAdminModal = ({ onClose, onSave, adminData = null }) => {
       setUsernameStatus({ checking: false, ok: false, msg: "Username must be at least 8 characters" });
       return;
     }
+    // Only letters and underscore; no numbers, spaces, dots, or other characters
+    if (!/^[A-Za-z_]+$/.test(value)) {
+      setUsernameStatus({ checking: false, ok: false, msg: "Only letters and underscore (_) allowed. No numbers, spaces, or dots (.)" });
+      return;
+    }
 
     setUsernameStatus({ checking: true, ok: false, msg: "" });
     const t = setTimeout(async () => {

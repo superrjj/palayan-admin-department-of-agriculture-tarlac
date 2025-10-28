@@ -71,18 +71,22 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       showToast("You can upload a maximum of 2000 images.");
       return;
     }
-    setImages((prev) => [...prev, ...files]);
+    convertHeicIfNeeded(files)
+      .then((converted) => setImages((prev) => [...prev, ...converted]))
+      .catch(() => setImages((prev) => [...prev, ...files]));
   };
 
   // Allow selecting an entire folder of images (Chromium/Edge)
   const handleFolderChange = (e) => {
     const allFiles = Array.from(e.target.files || []);
-    const imageFiles = allFiles.filter((f) => (f.type || '').startsWith('image/'));
+    const imageFiles = allFiles.filter((f) => (f.type || '').startsWith('image/') || /\.heic$|\.heif$/i.test(f.name));
     if (imageFiles.length + images.length > 2000) {
       showToast("You can upload a maximum of 2000 images.");
       return;
     }
-    setImages((prev) => [...prev, ...imageFiles]);
+    convertHeicIfNeeded(imageFiles)
+      .then((converted) => setImages((prev) => [...prev, ...converted]))
+      .catch(() => setImages((prev) => [...prev, ...imageFiles]));
   };
 
   const handleClearAllImages = () => setImages([]);
@@ -120,11 +124,58 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     return Promise.all(uploadPromises);
   };
 
+  // Convert HEIC images to JPEG for preview and upload
+  const convertHeicIfNeeded = async (fileList) => {
+    const results = [];
+    try {
+      const mod = await import('heic2any');
+      const heic2any = mod.default || mod;
+      for (const file of fileList) {
+        const isHeic = /heic|heif/i.test(file.type) || /\.heic$|\.heif$/i.test(file.name);
+        if (!isHeic) {
+          results.push(file);
+          continue;
+        }
+        try {
+          const output = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+          const blobs = Array.isArray(output) ? output : [output];
+          for (let i = 0; i < blobs.length; i++) {
+            const name = (i === 0 ? file.name : file.name.replace(/(\.[^.]+)?$/, `_${i}$1`)).replace(/\.(heic|heif)$/i, '.jpg');
+            const converted = new File([blobs[i]], name, { type: 'image/jpeg' });
+            results.push(converted);
+          }
+        } catch (err) {
+          console.warn('HEIC conversion failed, using original file', err);
+          results.push(file);
+        }
+      }
+      return results;
+    } catch (err) {
+      console.warn('heic2any not available, skipping conversion');
+      return fileList;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
       showToast("Disease name is required.");
+      return;
+    }
+
+    // Letters only (allow spaces) validation for Disease Name, Local Name, Scientific Name
+    const lettersOnly = /^[A-Za-z\s]+$/;
+    if (formData.name && !lettersOnly.test(formData.name.trim())) {
+      showToast("Disease name must contain letters only.");
+      return;
+    }
+    if (formData.localName && !lettersOnly.test(formData.localName.trim())) {
+      showToast("Local name must contain letters only.");
+      return;
+    }
+    if (formData.scientificName && !lettersOnly.test(formData.scientificName.trim())) {
+      showToast("Scientific name must contain letters only.");
       return;
     }
 
@@ -354,7 +405,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
                 <input
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,.heic,.HEIC,.heif,.HEIF"
                   className="hidden"
                   onChange={handleImageChange}
                   disabled={uploading}
@@ -370,7 +421,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
                     directory=""
                     webkitdirectory=""
                     multiple
-                    accept="image/*"
+                    accept="image/*,.heic,.HEIC,.heif,.HEIF"
                     onChange={handleFolderChange}
                     className="hidden"
                     disabled={uploading}
