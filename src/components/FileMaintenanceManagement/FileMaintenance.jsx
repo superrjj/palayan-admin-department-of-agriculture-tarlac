@@ -761,8 +761,8 @@ const FileMaintenance = () => {
   const selectorGrid = (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {[
-        { id: 'variety', label: 'Rice Variety', desc: 'Manage variety enums', icon: '🌾' },
-        { id: 'accounts', label: 'Accounts', desc: 'Manage account-related lists', icon: '👤' }
+        { id: 'variety', label: 'Variety Reference Lists', desc: 'Manage seasons, planting methods, environments, and year releases', icon: '🌾' },
+        { id: 'accounts', label: 'Account Security', desc: 'Manage security questions for account recovery', icon: '👤' }
       ].map((m) => (
         <button
           key={m.id}
@@ -802,8 +802,8 @@ const FileMaintenance = () => {
                 <span>←</span> Back
               </button>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Rice Variety Management</h2>
-                <p className="text-gray-600">Manage enumerations for rice varieties</p>
+                <h2 className="text-2xl font-bold text-gray-900">Variety Reference Lists</h2>
+                <p className="text-gray-600">Manage seasons, planting methods, environments, and year releases used by rice varieties</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -856,8 +856,8 @@ const FileMaintenance = () => {
                 <span>←</span> Back
               </button>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Account Management</h2>
-                <p className="text-gray-600">Manage account-related settings and security questions</p>
+                <h2 className="text-2xl font-bold text-gray-900">Account Security</h2>
+                <p className="text-gray-600">Manage security questions used for account recovery and verification</p>
               </div>
             </div>
             <div className="flex gap-3">
