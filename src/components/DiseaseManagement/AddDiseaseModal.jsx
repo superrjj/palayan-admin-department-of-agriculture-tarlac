@@ -27,6 +27,7 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [toast, setToast] = useState(null); // { type: 'error' | 'success', msg: string }
+  const [converting, setConverting] = useState(false);
   const isEdit = !!diseaseData;
 
   useEffect(() => {
@@ -71,9 +72,16 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       showToast("You can upload a maximum of 2000 images.");
       return;
     }
+    setConverting(true);
     convertHeicIfNeeded(files)
-      .then((converted) => setImages((prev) => [...prev, ...converted]))
-      .catch(() => setImages((prev) => [...prev, ...files]));
+      .then((converted) => {
+        setImages((prev) => [...prev, ...converted]);
+        setConverting(false);
+      })
+      .catch(() => {
+        setImages((prev) => [...prev, ...files]);
+        setConverting(false);
+      });
   };
 
   // Allow selecting an entire folder of images (Chromium/Edge)
@@ -84,9 +92,16 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       showToast("You can upload a maximum of 2000 images.");
       return;
     }
+    setConverting(true);
     convertHeicIfNeeded(imageFiles)
-      .then((converted) => setImages((prev) => [...prev, ...converted]))
-      .catch(() => setImages((prev) => [...prev, ...imageFiles]));
+      .then((converted) => {
+        setImages((prev) => [...prev, ...converted]);
+        setConverting(false);
+      })
+      .catch(() => {
+        setImages((prev) => [...prev, ...imageFiles]);
+        setConverting(false);
+      });
   };
 
   const handleClearAllImages = () => setImages([]);
@@ -124,36 +139,43 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
     return Promise.all(uploadPromises);
   };
 
-  // Convert HEIC images to JPEG for preview and upload
+  // Convert HEIC images to JPEG for preview and upload (optimized for training dataset)
   const convertHeicIfNeeded = async (fileList) => {
     const results = [];
-    try {
-      const mod = await import('heic2any');
-      const heic2any = mod.default || mod;
-      for (const file of fileList) {
-        const isHeic = /heic|heif/i.test(file.type) || /\.heic$|\.heif$/i.test(file.name);
-        if (!isHeic) {
-          results.push(file);
-          continue;
-        }
+    const heicFiles = fileList.filter(f => /heic|heif/i.test(f.type) || /\.heic$|\.heif$/i.test(f.name));
+    
+    // Skip conversion if no HEIC files
+    if (heicFiles.length === 0) {
+      return fileList;
+    }
+    
+    // Process HEIC files in small batches to prevent UI blocking
+    const batchSize = 3;
+    for (let i = 0; i < heicFiles.length; i += batchSize) {
+      const batch = heicFiles.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (file) => {
         try {
-          const output = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+          const mod = await import('heic2any');
+          const heic2any = mod.default || mod;
+          const output = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.7 });
           const blobs = Array.isArray(output) ? output : [output];
-          for (let i = 0; i < blobs.length; i++) {
-            const name = (i === 0 ? file.name : file.name.replace(/(\.[^.]+)?$/, `_${i}$1`)).replace(/\.(heic|heif)$/i, '.jpg');
-            const converted = new File([blobs[i]], name, { type: 'image/jpeg' });
+          for (let j = 0; j < blobs.length; j++) {
+            const name = (j === 0 ? file.name : file.name.replace(/(\.[^.]+)?$/, `_${j}$1`)).replace(/\.(heic|heif)$/i, '.jpg');
+            const converted = new File([blobs[j]], name, { type: 'image/jpeg' });
             results.push(converted);
           }
         } catch (err) {
           console.warn('HEIC conversion failed, using original file', err);
           results.push(file);
         }
-      }
-      return results;
-    } catch (err) {
-      console.warn('heic2any not available, skipping conversion');
-      return fileList;
+      }));
     }
+    
+    // Add non-HEIC files (JPG, JPEG, PNG, etc.) without conversion
+    const nonHeicFiles = fileList.filter(f => !(/heic|heif/i.test(f.type) || /\.heic$|\.heif$/i.test(f.name)));
+    results.push(...nonHeicFiles);
+    
+    return results;
   };
 
   const handleSubmit = async (e) => {
@@ -466,6 +488,19 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
               )}
             </div>
 
+            {/* Conversion Progress */}
+            {converting && (
+              <div className="w-full">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Converting HEIC images to JPEG...</span>
+                  <span>Please wait</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-blue-500 h-2 rounded-full animate-pulse" />
+                </div>
+              </div>
+            )}
+
             {/* Upload Progress */}
             {uploading && (
               <div className="w-full">
@@ -498,9 +533,9 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
             type="submit"
             form="disease-form"
             className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 text-white font-medium hover:opacity-90 shadow-md transition disabled:opacity-50"
-            disabled={uploading}
+            disabled={uploading || converting}
           >
-            {uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
+            {converting ? "Converting..." : uploading ? "Saving..." : (isEdit ? "Update" : "Save")}
           </button>
         </div>
       </div>
