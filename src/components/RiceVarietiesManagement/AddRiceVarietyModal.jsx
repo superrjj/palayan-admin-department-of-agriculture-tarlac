@@ -124,6 +124,25 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
     if (form.season.length === 0) e.season = 'Select at least one season.';
     if (form.environment.length === 0) e.environment = 'Select at least one environment.';
 
+    // Format validation for alphanumeric fields (allow spaces)
+    if (form.varietyName && !/^[a-zA-Z0-9\s]+$/.test(form.varietyName)) {
+      e.varietyName = 'Only letters, numbers, and spaces allowed.';
+    }
+    if (form.releaseName && !/^[a-zA-Z0-9\s]+$/.test(form.releaseName)) {
+      e.releaseName = 'Only letters, numbers, and spaces allowed.';
+    }
+    if (form.breedingCode && !/^[a-zA-Z0-9\s]+$/.test(form.breedingCode)) {
+      e.breedingCode = 'Only letters, numbers, and spaces allowed.';
+    }
+
+    // Format validation for letters only
+    if (form.breederOrigin && !/^[a-zA-Z\s]+$/.test(form.breederOrigin)) {
+      e.breederOrigin = 'Only letters allowed.';
+    }
+    if (form.location && !/^[a-zA-Z\s]+$/.test(form.location)) {
+      e.location = 'Only letters allowed.';
+    }
+
     if (form.maturityDays && !/^\d+$/.test(form.maturityDays)) e.maturityDays = 'Enter a whole number.';
     if (form.tillers && !/^\d+$/.test(form.tillers)) e.tillers = 'Enter a whole number.';
     if (form.plantHeight && !/^\d+$/.test(form.plantHeight)) e.plantHeight = 'Enter a whole number.';
@@ -157,21 +176,24 @@ const AddRiceVarietyModal = ({ onClose, onSave, varietyData = null }) => {
       // Check in rice_seed_varieties
       const varietiesQuery = query(
         collection(db, "rice_seed_varieties"),
-        where("varietyName", "==", nameToCheck)
+        where("varietyName", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const varietiesSnapshot = await getDocs(varietiesQuery);
       
       // Check in rice_local_pests
       const pestsQuery = query(
         collection(db, "rice_local_pests"),
-        where("name", "==", nameToCheck)
+        where("name", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const pestsSnapshot = await getDocs(pestsQuery);
       
       // Check in rice_local_diseases
       const diseasesQuery = query(
         collection(db, "rice_local_diseases"),
-        where("name", "==", nameToCheck)
+        where("name", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const diseasesSnapshot = await getDocs(diseasesQuery);
       

@@ -143,21 +143,24 @@ const AddDiseaseModal = ({ onClose, onSave, diseaseData = null }) => {
       // Check in rice_seed_varieties
       const varietiesQuery = query(
         collection(db, "rice_seed_varieties"),
-        where("varietyName", "==", nameToCheck)
+        where("varietyName", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const varietiesSnapshot = await getDocs(varietiesQuery);
       
       // Check in rice_local_pests
       const pestsQuery = query(
         collection(db, "rice_local_pests"),
-        where("name", "==", nameToCheck)
+        where("name", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const pestsSnapshot = await getDocs(pestsQuery);
       
       // Check in rice_local_diseases
       const diseasesQuery = query(
         collection(db, "rice_local_diseases"),
-        where("name", "==", nameToCheck)
+        where("name", "==", nameToCheck),
+        where("isDeleted", "==", false)
       );
       const diseasesSnapshot = await getDocs(diseasesQuery);
       
