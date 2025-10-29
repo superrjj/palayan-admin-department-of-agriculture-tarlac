@@ -344,6 +344,21 @@ const FileMaintenance = () => {
   const addItem = (keyName) => {
     const val = (inputs[keyName] || "").trim();
     if (!val) return;
+    // Validation rules: letters-only for seasons/plantingMethods/environments; numbers-only for yearReleases
+    const lettersOnly = /^[A-Za-z\s]+$/;
+    const digitsOnly = /^\d+$/;
+    if (["seasons", "plantingMethods", "environments"].includes(keyName)) {
+      if (!lettersOnly.test(val)) {
+        showToast(false, "Only letters and spaces are allowed.");
+        return;
+      }
+    }
+    if (keyName === "yearReleases") {
+      if (!digitsOnly.test(val)) {
+        showToast(false, "Year Releases must be numbers only.");
+        return;
+      }
+    }
     if ((draft[keyName] || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
       showToast(false, "Already exists.");
       return;
@@ -431,6 +446,12 @@ const FileMaintenance = () => {
   const addSecurityQuestion = () => {
     const val = (sqInput || "").trim();
     if (!val) return;
+    // Letters and spaces only validation
+    const lettersOnly = /^[A-Za-z\s]+$/;
+    if (!lettersOnly.test(val)) {
+      showToast(false, "Only letters and spaces are allowed.");
+      return;
+    }
     if ((sqDraft || []).some((v) => String(v).toLowerCase() === val.toLowerCase())) {
       showToast(false, "Already exists.");
       return;
